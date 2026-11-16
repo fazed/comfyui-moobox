@@ -56,6 +56,17 @@ Restart ComfyUI afterwards. No extra packages or build step are needed.
   The **All seeds** box above the rows applies 🔁, ✨ or ♻ to every row at once.
   `-1` is replaced when the workflow is queued, so image metadata contains the real seed.
 
+- **Groups Toggle (MooBox)**: one switch per group in the workflow. Switching a group off
+  bypasses (or mutes, via `action`) every node inside it; switching it on makes them active again.
+  `match_title` (text or regular expression) and `match_colors` (ComfyUI color names or hex,
+  comma separated) limit the list, `sort` is by position or alphanumeric, → jumps to the group.
+  With `all_graphs` (default on) the groups inside subgraphs are listed too, with the subgraph name
+  next to them, so a detailer group can be switched from the root view. `match_subgraph` is a list of the subgraph names (filled in by the editor) that limits it to one
+  subgraph and the subgraphs inside it; the root graph is then left out. `(all)` lists everything. A subgraph used by several
+  nodes is one shared definition, so switching its groups affects every copy.
+  A group counts as on while at least one of its nodes is active. The node itself never runs
+  and is never toggled by its own group.
+
 ### MooBox / Prompt
 
 Type in a text field of a node (Nodes 2.0 and classic) and suggestions from your
@@ -119,7 +130,8 @@ python3 migrate_workflow.py /path/to/workflow.json
 ```
 
 This writes `workflow-moobox.json`, keeps the connections and selections and sets the
-converted loaders to **LoRA Manager**. The original workflow is left untouched.
+converted loaders to **LoRA Manager**. rgthree's Fast Groups Bypasser and Muter become
+**Groups Toggle** (those with a connected output are left alone); other rgthree nodes are listed. The original workflow is left untouched.
 A connected text input needs manual conversion.
 
 Keep a backup of this folder. ComfyUI updates may, as with other node packs, require changes.

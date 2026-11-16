@@ -11,7 +11,7 @@ Thanks for helping out. Please also read [AGENTS.md](AGENTS.md), which holds the
 | `compare.py` | Image Compare node. |
 | `logic.py` | Pure logic without ComfyUI imports (tags, trigger words, prompts), easy to test. |
 | `routes.py` | Local HTTP endpoints (`/moobox-lora/...`, `/moobox-tags`). |
-| `web/` | Frontend. `widgets.js` (loader and triggers), `seeds.js`, `compare.js`, `autocomplete.js`, `tags.js`, `tagprompt.js`, `state.js`, `manager.js`, `styles.css`. |
+| `web/` | Frontend. `widgets.js` (loader and triggers), `seeds.js`, `groups.js` and `groupstate.js` (Groups Toggle), `compare.js`, `autocomplete.js`, `tags.js`, `tagprompt.js`, `state.js`, `manager.js`, `styles.css`. |
 | `migrate_workflow.py` | Converts an exported workflow into a copy that uses the MooBox nodes. |
 | `tests/` | Python tests (`test_*.py`) and JavaScript tests (`*.test.mjs`). |
 

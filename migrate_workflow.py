@@ -10,6 +10,9 @@ from pathlib import Path
 from logic import split_words
 
 
+GROUP_NODES = {"Fast Groups Bypasser (rgthree)": "bypass", "Fast Groups Muter (rgthree)": "mute"}
+
+
 def unweight(text: str) -> tuple[str, float]:
     match = re.fullmatch(r"\((.+):(-?[\d.]+)\)", text.strip())
     return (match[1], float(match[2])) if match else (text, 1)
@@ -23,6 +26,16 @@ def convert_workflow(workflow: dict) -> tuple[dict, int]:
         nonlocal count
         for node in graph.get("nodes", []):
             kind = node.get("type")
+            if kind in GROUP_NODES and not any(output.get("links") for output in node.get("outputs", [])):
+                properties = node.setdefault("properties", {})
+                sort = properties.get("sort")
+                node["type"] = "MooBoxGroupsToggle"
+                node["inputs"] = []
+                node["outputs"] = []
+                node["widgets_values"] = [GROUP_NODES[kind], properties.get("matchTitle", ""), properties.get("matchColors", ""), "alphanumeric" if sort == "alphanumeric" else "position", properties.get("showAllGraphs", True), "(all)"]
+                node["properties"] = {"Node name for S&R": node["type"]}
+                count += 1
+                continue
             if kind not in ("Lora Loader (LoraManager)", "TriggerWord Toggle (LoraManager)"):
                 continue
             values = node.get("widgets_values", [])
@@ -92,6 +105,9 @@ def main():
         json.dump(converted, handle, ensure_ascii=False, indent=2)
         handle.write("\n")
     print(f"Converted {count} nodes: {output}")
+    left = sorted({match for match in re.findall(r'"type": "([^"]*\(rgthree\))"', output.read_text(encoding="utf-8"))})
+    if left:
+        print("Still rgthree (no MooBox replacement): " + ", ".join(left))
 
 
 if __name__ == "__main__":

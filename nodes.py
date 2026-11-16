@@ -176,3 +176,27 @@ class MooBoxIllustriousTags(io.ComfyNode):
     @classmethod
     def execute(cls, tags, quality_tags, trigger_words=None):
         return io.NodeOutput(order_illustrious(join_prompt(tags, trigger_words or ""), tag_categories(), quality_tags == "front"))
+
+
+class MooBoxGroupsToggle(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="MooBoxGroupsToggle",
+            display_name="Groups Toggle (MooBox)",
+            category="MooBox/Utility",
+            description="One switch per group to bypass or mute all nodes in it. Frontend only; never runs.",
+            inputs=[
+                io.Combo.Input("action", options=["bypass", "mute"], tooltip="What switching a group off does to its nodes."),
+                io.String.Input("match_title", default="", tooltip="Only show groups whose title matches this text or regular expression."),
+                io.String.Input("match_colors", default="", tooltip="Only show groups with these colors: ComfyUI color names or hex values, comma separated."),
+                io.Combo.Input("sort", options=["position", "alphanumeric"]),
+                io.Boolean.Input("all_graphs", default=True, tooltip="Also list the groups inside subgraphs and switch their nodes."),
+                io.Combo.Input("match_subgraph", options=["(all)"], tooltip="With all_graphs: only list the groups of this subgraph (and the subgraphs inside it). The list is filled in the editor; (all) lists every graph, root included."),
+            ],
+            outputs=[],
+        )
+
+    @classmethod
+    def execute(cls, action, match_title, match_colors, sort, all_graphs, match_subgraph):
+        return io.NodeOutput()

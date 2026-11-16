@@ -82,3 +82,9 @@ class SeedTests(unittest.TestCase):
     def test_rejects_empty_list(self):
         with self.assertRaises(ValueError):
             pack.MooBoxSeeds.execute("[]")
+
+
+class GroupsToggleTests(unittest.TestCase):
+    def test_runs_without_output(self):
+        output = pack.MooBoxGroupsToggle.execute("bypass", "", "", "position", True, "(all)")
+        self.assertEqual(output.result, ())

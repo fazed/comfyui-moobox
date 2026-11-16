@@ -88,6 +88,17 @@ class MigrationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "linked text"):
             convert_workflow({"nodes": [{"type": "Lora Loader (LoraManager)", "inputs": [{"name": "text", "link": 1}]}]})
 
+    def test_group_toggles_become_moobox_nodes(self):
+        properties = {"matchTitle": "NAG", "matchColors": "", "sort": "custom alphabet", "showNav": True}
+        workflow = {"nodes": [
+            {"id": 1, "type": "Fast Groups Bypasser (rgthree)", "title": "Toggle: NAG", "inputs": [], "outputs": [{"name": "OPT_CONNECTION", "links": None}], "properties": properties},
+            {"id": 2, "type": "Fast Groups Muter (rgthree)", "outputs": [{"name": "OPT_CONNECTION", "links": [5]}], "properties": {}}]}
+        converted, count = convert_workflow(workflow)
+        self.assertEqual(count, 1)
+        first, linked = converted["nodes"]
+        self.assertEqual((first["type"], first["title"], first["widgets_values"]), ("MooBoxGroupsToggle", "Toggle: NAG", ["bypass", "NAG", "", "position", True, "(all)"]))
+        self.assertEqual(linked["type"], "Fast Groups Muter (rgthree)")
+
 
 if __name__ == "__main__":
     unittest.main()
