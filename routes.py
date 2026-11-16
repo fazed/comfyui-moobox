@@ -10,8 +10,10 @@ import comfy.utils
 import folder_paths
 from server import PromptServer
 
+from .jobs import install as install_jobs
 from .nodes import TAGS_FILE, resolve_lora
 
+install_jobs(PromptServer.instance)
 
 MAX_TAGS_BYTES = 64 * 1024 * 1024
 PREVIEW_SUFFIXES = (".preview.jpeg", ".preview.jpg", ".preview.png", ".preview.webp", ".jpeg", ".jpg", ".png", ".webp")

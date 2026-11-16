@@ -11,5 +11,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the layout of this pack and how to ad
 - Keep trigger selections, including temporarily absent groups, in workflow widget state.
 - No Internet access, model downloads, or writes to model files or metadata. The only exception is the tag list download, which runs only when the user clicks Download in the tag autocomplete settings.
 - Tag autocomplete attaches to textareas through document-level listeners so it works in Nodes 2.0 (Vue) and legacy nodes; never hook widget constructors.
+- The jobs monitor only observes. Stopping is limited to jobs of this browser tab and goes through ComfyUI's own cancel endpoint; external jobs stay read-only.
 - Run the Python and JavaScript tests documented in README.md after behavior changes.
 - Do not migrate or overwrite user workflows automatically; the converter writes new files.

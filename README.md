@@ -1,7 +1,7 @@
 # MooBox
 
 A custom ComfyUI node pack with a searchable LoRA loader, stable trigger word selections,
-tag autocomplete for prompts, an image comparer and a multi-seed node.
+tag autocomplete for prompts, an image comparer, a multi-seed node and a jobs monitor.
 Updating LoRA Manager never replaces files in this folder, and LoRA Manager is optional.
 
 ## Installation
@@ -101,6 +101,25 @@ a1111-tagcomplete `danbooru.csv`). Formats: `tag`, `tag,count` or
 `tag,type,count,"alias1,alias2"`.
 
 ## LoRA loader details
+
+### Jobs
+
+A **Jobs** tab in the sidebar and a thin progress line at the top of the window and/or under
+the Jobs sidebar icon (**Settings → MooBox → Jobs → Progress bar position**, default both).
+Jobs started from this browser tab are **Local builds**: you can stop a running build
+or remove a queued one. Jobs from other clients (API agents, another tab) are
+**External jobs** and stay read-only. Each group has a **History** dropdown with one
+collapsible entry per run; open a run to see its steps.
+
+A small **jobs widget** sits in the top action bar: a progress meter with the current node and
+counts of local and external jobs. Click it to open the Jobs tab, drag its grip to float it
+anywhere (remembered), drop it on the action bar or double-click the grip to dock it again. It can be hidden under
+**Settings → MooBox → Jobs → Widget**.
+
+The progress line shows the running local build, otherwise a running external job
+(teal). Click it to open the Jobs tab. It is an estimate based on finished nodes,
+never remaining time. Only node ids, titles, class types, status and progress are shared
+with other clients; inputs, outputs and errors are not, and client ids only as a hash.
 
 A new loader node defaults to **LoRA Manager** if it is installed, otherwise to ComfyUI,
 and the LoRA Manager option cannot be selected. Saved workflows keep their own choice.
