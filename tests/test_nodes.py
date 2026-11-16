@@ -83,6 +83,14 @@ class SeedTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             pack.MooBoxSeeds.execute("[]")
 
+    def test_api_random_seed_is_replaced_and_reruns(self):
+        output = pack.MooBoxSeeds.execute("[-1, 5]")
+        self.assertTrue(0 <= output.result[0] < pack.MAX_RANDOM)
+        self.assertEqual(output.result[1], 5)
+        fingerprint = pack.MooBoxSeeds.fingerprint_inputs("[-1, 5]")
+        self.assertNotEqual(fingerprint, fingerprint)
+        self.assertEqual(pack.MooBoxSeeds.fingerprint_inputs("[3, 5]"), "[3, 5]")
+
 
 class GroupsToggleTests(unittest.TestCase):
     def test_runs_without_output(self):

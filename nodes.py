@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 
 import folder_paths
 import nodes
@@ -137,6 +138,7 @@ class MooBoxTagTextPrompt(io.ComfyNode):
 
 
 MAX_SEEDS = 16
+MAX_RANDOM = 2 ** 50
 
 
 class MooBoxSeeds(io.ComfyNode):
@@ -150,9 +152,14 @@ class MooBoxSeeds(io.ComfyNode):
             outputs=[io.Int.Output(f"seed_{i}") for i in range(1, MAX_SEEDS + 1)],
         )
 
+    # The editor replaces -1 when queueing; API prompts that still hold -1 get a new random seed on every run.
+    @classmethod
+    def fingerprint_inputs(cls, seeds):
+        return float("nan") if -1 in json.loads(seeds) else seeds
+
     @classmethod
     def execute(cls, seeds):
-        values = [int(seed) for seed in json.loads(seeds)]
+        values = [random.randrange(MAX_RANDOM) if seed == -1 else seed for seed in map(int, json.loads(seeds))]
         if not 1 <= len(values) <= MAX_SEEDS:
             raise ValueError(f"Use 1 to {MAX_SEEDS} seeds.")
         return io.NodeOutput(*values, *[0] * (MAX_SEEDS - len(values)))

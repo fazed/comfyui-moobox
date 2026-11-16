@@ -1,9 +1,10 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+import { afterRun, randomSeed, savedNode, validSeed } from "./seedstate.js";
+import "./styles.js";
 
 const SEEDS = "MooBoxSeeds";
 const MAX_SEEDS = 16;
-const MAX_RANDOM = 2 ** 50;
 const ROW_HEIGHT = 38;
 const MODES = {
   fixed: { icon: "📌", label: "Fixed", info: "Leaves the value unchanged" },
@@ -16,6 +17,11 @@ let menu;
 function closeMenu() {
   menu?.remove();
   menu = undefined;
+  document.removeEventListener("pointerdown", dismiss, true);
+}
+
+function dismiss(event) {
+  if (!menu?.contains(event.target)) closeMenu();
 }
 
 function openMenu(anchor, current, choose) {
@@ -35,10 +41,8 @@ function openMenu(anchor, current, choose) {
   menu.style.left = `${Math.max(8, Math.min(rect.right - 300, window.innerWidth - 310))}px`;
   menu.style.top = `${Math.min(rect.bottom + 4, window.innerHeight - 190)}px`;
   document.body.append(menu);
-  setTimeout(() => document.addEventListener("pointerdown", (event) => { if (!menu?.contains(event.target)) closeMenu(); }, { once: true }));
+  document.addEventListener("pointerdown", dismiss, true);
 }
-
-const randomSeed = () => Math.floor(Math.random() * MAX_RANDOM);
 
 function element(tag, className, text) {
   const el = document.createElement(tag);
@@ -93,7 +97,7 @@ function seedsWidget(node, name) {
       input.setAttribute("aria-label", `Seed ${index + 1}`);
       input.addEventListener("change", () => {
         const parsed = Number(input.value.trim());
-        if (input.value.trim() !== "" && Number.isSafeInteger(parsed)) update(index, { seed: parsed });
+        if (input.value.trim() !== "" && validSeed(parsed)) update(index, { seed: parsed });
         else input.value = entry.seed;
       });
       const mode = entry.mode ?? "fixed";
@@ -135,6 +139,11 @@ function seedsWidget(node, name) {
   });
   widget.computeLayoutSize = () => ({ minHeight: height(), minWidth: 300 });
   widget.serializeValue = () => JSON.stringify(state.map((entry) => entry.seed));
+  const removed = widget.onRemove;
+  widget.onRemove = function () {
+    closeMenu();
+    return removed?.apply(this, arguments);
+  };
   render();
   return { widget, minWidth: 320, minHeight: height() };
 }
@@ -149,17 +158,11 @@ function findNode(id) {
   return node;
 }
 
-function afterRun({ seed, mode }, used) {
-  if (seed === -1) return -1;
-  if (mode === "increment") return used + 1;
-  if (mode === "decrement") return Math.max(0, used - 1);
-  if (mode === "randomize") return randomSeed();
-  return seed;
-}
-
 // Seeds are resolved when the prompt is queued so the saved image metadata holds the real values.
+// The widgets only advance once the server accepted the prompt.
 const queuePrompt = api.queuePrompt;
 api.queuePrompt = async function (index, prompt, ...args) {
+  const advance = [];
   for (const [id, item] of Object.entries(prompt.output ?? {})) {
     if (item.class_type !== SEEDS) continue;
     const used = JSON.parse(item.inputs.seeds).map((seed) => (seed === -1 ? randomSeed() : seed));
@@ -167,11 +170,13 @@ api.queuePrompt = async function (index, prompt, ...args) {
     const widget = findNode(id)?.widgets?.find((w) => w.name === "seeds");
     if (!widget) continue;
     const current = JSON.parse(widget.value);
-    const saved = prompt.workflow?.nodes?.find((n) => String(n.id) === id);
+    const saved = savedNode(prompt.workflow, id);
     if (saved) saved.widgets_values = [JSON.stringify(current.map((entry, i) => ({ ...entry, seed: used[i], last: used[i] })))];
-    widget.value = JSON.stringify(current.map((entry, i) => ({ ...entry, last: used[i], seed: afterRun(entry, used[i]) })));
+    advance.push(() => { widget.value = JSON.stringify(current.map((entry, i) => ({ ...entry, last: used[i], seed: afterRun(entry, used[i]) }))); });
   }
-  return queuePrompt.call(this, index, prompt, ...args);
+  const result = await queuePrompt.call(this, index, prompt, ...args);
+  for (const apply of advance) apply();
+  return result;
 };
 
 app.registerExtension({
