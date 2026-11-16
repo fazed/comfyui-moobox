@@ -1,19 +1,20 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { completion, currentToken, parseTags, searchTags } from "./tags.js";
+import "./styles.js";
 
 const PREFIX = "MooBox.TagAutocomplete.";
 const TEXT_FIELDS = ".comfy-multiline-input, [data-widgets-grid-node-id]";
 // The widget name of natural-language inputs; Nodes 2.0 wraps it in data-widget-name, legacy nodes use it as placeholder.
 const NATURAL_TEXT = "natural_text";
 const MIRRORED = ["boxSizing", "width", "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft", "fontStyle", "fontWeight", "fontSize", "lineHeight", "fontFamily", "letterSpacing", "textTransform", "tabSize", "wordSpacing"];
+// Larger lists are not put in the settings textarea; they would make the settings dialog sluggish.
+const MAX_EDIT_CHARS = 256 * 1024;
+const LIST_HINT = "One tag per line: tag, tag,count or tag,type,count,aliases";
 
-const style = document.createElement("link");
-style.rel = "stylesheet";
-style.href = new URL("./styles.css", import.meta.url).href;
-document.head.append(style);
-
-let entries = [];
+// The list is loaded on the first keystroke in a field with autocomplete enabled, not on page load.
+let entries = null;
+let loading = null;
 let popup = null;
 let hits = [];
 let selected = 0;
@@ -30,7 +31,7 @@ function element(tag, className, text) {
 }
 
 async function loadTags() {
-  const response = await api.fetchApi("/moobox-tags", { cache: "no-store" });
+  const response = await api.fetchApi("/moobox-tags");
   const text = response.ok ? await response.text() : "";
   entries = parseTags(text);
   return text;
@@ -58,6 +59,11 @@ function close() {
   popup = null;
   hits = [];
   field = null;
+}
+
+// Called by a tag widget that is being removed, so its suggestions do not outlive it.
+export function release(el) {
+  if (field === el) close();
 }
 
 function render() {
@@ -121,11 +127,14 @@ function update(textarea) {
 function usable(target) {
   const picker = target instanceof HTMLInputElement && target.dataset.ktTagPicker;
   const text = target instanceof HTMLTextAreaElement && !target.readOnly && !target.dataset.ktNoAc && target.placeholder !== NATURAL_TEXT && !target.closest(`[data-widget-name="${NATURAL_TEXT}"]`) && (target.dataset.ktTagField || target.closest(TEXT_FIELDS));
-  return (picker || text) && setting("Enabled") && entries.length;
+  return (picker || text) && setting("Enabled");
 }
 
 document.addEventListener("input", (event) => {
-  if (usable(event.target) && !event.isComposing) update(event.target);
+  const target = event.target;
+  if (!usable(target) || event.isComposing) return;
+  if (entries) update(target);
+  else (loading ??= loadTags()).then(() => { if (document.activeElement === target) update(target); });
 }, true);
 
 document.addEventListener("keydown", (event) => {
@@ -155,10 +164,13 @@ function listEditor() {
   const area = element("textarea", "kt-tags-text");
   area.dataset.ktNoAc = "1";
   area.spellcheck = false;
-  area.placeholder = "One tag per line: tag, tag,count or tag,type,count,aliases";
   const status = element("div", "kt-tags-status");
+  let large = false;
   const show = async () => {
-    area.value = await loadTags();
+    const text = await loadTags();
+    large = text.length > MAX_EDIT_CHARS;
+    area.value = large ? "" : text;
+    area.placeholder = large ? "The saved list is too large to show here. Paste a complete new list to replace it." : LIST_HINT;
     status.textContent = `${entries.length.toLocaleString("en")} tags loaded`;
   };
   const run = (label, action) => {
@@ -177,7 +189,10 @@ function listEditor() {
   };
   const buttons = element("div", "kt-tags-buttons");
   buttons.append(
-    run("Save list", () => send("/moobox-tags", { method: "PUT", body: area.value })),
+    run("Save list", () => {
+      if (large && !area.value.trim()) throw new Error("Paste a list first; saving now would empty the saved list.");
+      return send("/moobox-tags", { method: "PUT", body: area.value });
+    }),
     run("Download from URL", () => send("/moobox-tags/download", { method: "POST", body: JSON.stringify({ url: setting("Url") }) })),
     run("Reload", show),
   );
@@ -198,5 +213,4 @@ app.registerExtension({
     { id: PREFIX + "Url", category: ["MooBox", "Tag autocomplete", "Url"], name: "Tag list URL (downloaded only when you click Download)", type: "text", defaultValue: "https://raw.githubusercontent.com/DominikDoom/a1111-sd-webui-tagcomplete/main/tags/danbooru.csv" },
     { id: PREFIX + "List", category: ["MooBox", "Tag autocomplete", "List"], name: "Tag list", type: listEditor, defaultValue: "" },
   ],
-  setup: loadTags,
 });

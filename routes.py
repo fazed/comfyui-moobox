@@ -66,8 +66,9 @@ async def preview(request: web.Request) -> web.Response:
 
 def save_tags(data: bytes) -> None:
     os.makedirs(os.path.dirname(TAGS_FILE), exist_ok=True)
-    with open(TAGS_FILE, "wb") as file:
+    with open(TAGS_FILE + ".tmp", "wb") as file:
         file.write(data)
+    os.replace(TAGS_FILE + ".tmp", TAGS_FILE)
 
 
 @PromptServer.instance.routes.get("/moobox-tags")
@@ -79,7 +80,11 @@ async def get_tags(request: web.Request) -> web.Response:
 
 @PromptServer.instance.routes.put("/moobox-tags")
 async def put_tags(request: web.Request) -> web.Response:
+    if (request.content_length or 0) > MAX_TAGS_BYTES:
+        raise web.HTTPRequestEntityTooLarge(MAX_TAGS_BYTES, request.content_length)
     data = await request.read()
+    if len(data) > MAX_TAGS_BYTES:
+        raise web.HTTPRequestEntityTooLarge(MAX_TAGS_BYTES, len(data))
     await asyncio.to_thread(save_tags, data)
     return web.json_response({"bytes": len(data)})
 

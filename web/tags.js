@@ -36,10 +36,13 @@ export function searchTags(entries, query, limit) {
   if (!q) return [];
   const starts = [], contains = [];
   for (const { tag, key, count, aliases } of entries) {
-    const alias = aliases.find((name) => name.startsWith(q));
-    if (key.startsWith(q)) starts.push({ tag, count });
-    else if (alias) starts.push({ tag, count, alias });
-    else if (key.includes(q)) contains.push({ tag, count });
+    if (key.startsWith(q)) {
+      starts.push({ tag, count });
+    } else {
+      const alias = aliases.find((name) => name.startsWith(q));
+      if (alias) starts.push({ tag, count, alias });
+      else if (key.includes(q)) contains.push({ tag, count });
+    }
     if (starts.length >= limit) break;
   }
   return starts.concat(contains).slice(0, limit);

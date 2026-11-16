@@ -1,4 +1,5 @@
 import { app } from "../../scripts/app.js";
+import { release } from "./autocomplete.js";
 import { formatTags } from "./tags.js";
 
 const MIN_HEIGHT = 190;
@@ -41,6 +42,12 @@ function tagWidget(node, name) {
   });
   widget.computeLayoutSize = () => ({ minHeight: MIN_HEIGHT, minWidth: 300 });
   widget.serializeValue = () => formatTags(area.value);
+  const removed = widget.onRemove;
+  widget.onRemove = function () {
+    release(picker);
+    release(area);
+    return removed?.apply(this, arguments);
+  };
   return { widget, minWidth: 300, minHeight: MIN_HEIGHT };
 }
 

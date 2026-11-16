@@ -1,0 +1,8 @@
+[
+  ["a,b", "a, b"],
+  ["1girl,  solo,,\nlong   hair\r\nSolo", "1girl, solo, long hair"],
+  ["(a, b:1.2), c", "(a, b:1.2), c"],
+  ["cat \\(ears\\), cat \\(ears\\)", "cat \\(ears\\)"],
+  ["  ,  , ", ""],
+  ["x\ty", "x y"]
+]

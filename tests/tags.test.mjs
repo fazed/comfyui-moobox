@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
-import { completion, currentToken, parseTags, searchTags } from '../web/tags.js';
+import { completion, currentToken, formatTags, parseTags, searchTags } from '../web/tags.js';
+
+test('formatTags matches the Python format_tags on the shared cases', async () => {
+  for (const [text, expected] of JSON.parse(await readFile(new URL('./format_cases.json', import.meta.url), 'utf8'))) assert.equal(formatTags(text), expected);
+});
 
 const entries = parseTags('long_hair,0,200,"nagahair,lh"\n1girl,0,900,\nsolo,50\nhair_ornament,0,10,null\nlong_sleeves\n"quoted,tag",5');
 

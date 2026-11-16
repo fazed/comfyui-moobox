@@ -62,6 +62,13 @@ class PromptOrderTests(unittest.TestCase):
 
 class MigrationTests(unittest.TestCase):
     def test_preserves_links_disabled_entries_and_original(self):
+class FormatParityTests(unittest.TestCase):
+    def test_shared_cases_match_the_javascript_format(self):
+        cases = json.loads((Path(__file__).with_name("format_cases.json")).read_text(encoding="utf-8"))
+        for text, expected in cases:
+            self.assertEqual(format_tags(text), expected)
+
+
         workflow = {"nodes": [
             {"id": 1, "type": "Lora Loader (LoraManager)", "inputs": [{"name": "model", "link": 10}], "widgets_values": [{"version": 1}, "<lora:alpha:0.4>", [{"name": "alpha", "strength": 0.4, "active": False}]]},
             {"id": 2, "type": "TriggerWord Toggle (LoraManager)", "widgets_values": [True, True, True, [{"text": "(alpha:0.80)", "active": False, "strength": 0.8}], "alpha"]}], "links": [[11, 1, 2, 2, 0, "STRING"]]}
