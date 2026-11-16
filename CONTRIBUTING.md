@@ -10,8 +10,9 @@ Thanks for helping out. Please also read [AGENTS.md](AGENTS.md), which holds the
 | `nodes.py` | Node classes (V3 schemas): LoRA Loader, Trigger Words, tag prompts, Seeds. |
 | `compare.py` | Image Compare node. |
 | `logic.py` | Pure logic without ComfyUI imports (tags, trigger words, prompts), easy to test. |
+| `jobs.py` | Read-only job monitor (snapshot route and `moobox_jobs.snapshot` event). |
 | `routes.py` | Local HTTP endpoints (`/moobox-lora/...`, `/moobox-tags`). |
-| `web/` | Frontend. `widgets.js` (loader and triggers), `seeds.js`, `groups.js` and `groupstate.js` (Groups Toggle), `compare.js`, `autocomplete.js`, `tags.js`, `tagprompt.js`, `state.js`, `manager.js`, `styles.css`. |
+| `web/` | Frontend. `widgets.js` (loader and triggers), `seeds.js` and `seedstate.js` (Seeds), `groups.js` and `groupstate.js` (Groups Toggle), `jobs.js` and `jobspanel.js` (Jobs tab and top bar), `jobswidget.js` (jobs widget in the action bar), `compare.js` and `compare.css`, `autocomplete.js`, `tags.js`, `tagprompt.js`, `state.js`, `manager.js`, `styles.css` (linked once through `styles.js`), `jobs.css`. Modules named `*state.js` hold pure logic and are tested without ComfyUI. |
 | `migrate_workflow.py` | Converts an exported workflow into a copy that uses the MooBox nodes. |
 | `tests/` | Python tests (`test_*.py`) and JavaScript tests (`*.test.mjs`). |
 
@@ -23,6 +24,9 @@ From this folder, after every behavior change:
 python -m unittest discover -s tests -p "test_*.py"
 node --experimental-vm-modules --test tests/*.test.mjs
 ```
+
+`bun test tests` is an alternative for the JavaScript tests. Run the Python tests with an
+interpreter that has `aiohttp`, such as ComfyUI's own `.venv`.
 
 ## Adding a node
 

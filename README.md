@@ -34,13 +34,16 @@ Restart ComfyUI afterwards. No extra packages or build step are needed.
   If several files share a name, you can pick the right folder.
 - **Trigger Words (MooBox)**: connect the loader's `trigger_words`. Toggle whole groups
   or single words and adjust the group weight if you like.
-  Groups that temporarily disappear keep their selection when they come back.
+  Groups that temporarily disappear keep their selection when they come back;
+  **Forget N absent** removes those saved selections.
+  When the connected loader is bypassed or muted, no trigger words are output.
   The source input is collapsible; active counts stay visible.
 - **Image Compare (MooBox)**: connect two or more images (a new input appears
   automatically). Use the A and B dropdowns to choose which two to compare
   (⇄ swaps them; the first two connected are the default) and pick a mode:
   **A/B**, **Slider**, **Blend**, **Difference** or **Blink**
-  (ⓘ explains the chosen mode). Run the workflow to compare.
+  (ⓘ explains the chosen mode). Run the workflow to compare. The results are not stored
+  in the workflow: reloading it (also undo) shows them again only after the next run.
 
 ### MooBox / Utility
 
@@ -54,16 +57,22 @@ Restart ComfyUI afterwards. No extra packages or build step are needed.
   - **×** remove the row.
 
   The **All seeds** box above the rows applies 🔁, ✨ or ♻ to every row at once.
-  `-1` is replaced when the workflow is queued, so image metadata contains the real seed.
+  `-1` is replaced when the workflow is queued, so image metadata contains the real seed
+  (also for Seeds nodes inside subgraphs). Only `-1` means random; other negative values are refused.
+  Seeds advance only after ComfyUI accepted the prompt. A prompt sent through the API that
+  still holds `-1` gets a new random seed from the server on every run.
 
 - **Groups Toggle (MooBox)**: one switch per group in the workflow. Switching a group off
-  bypasses (or mutes, via `action`) every node inside it; switching it on makes them active again.
-  `match_title` (text or regular expression) and `match_colors` (ComfyUI color names or hex,
+  bypasses (or mutes, via `action`) its active nodes; switching it on makes the nodes in that mode
+  active again, so a node muted inside a bypass group stays muted. A node you bypassed by hand inside
+  a bypass group cannot be told apart and is switched on as well.
+  `match_title` (a case-insensitive substring or regular expression) and `match_colors` (ComfyUI color names or hex,
   comma separated) limit the list, `sort` is by position or alphanumeric, → jumps to the group.
-  With `all_graphs` (default on) the groups inside subgraphs are listed too, with the subgraph name
-  next to them, so a detailer group can be switched from the root view. `match_subgraph` is a list of the subgraph names (filled in by the editor) that limits it to one
-  subgraph and the subgraphs inside it; the root graph is then left out. `(all)` lists everything. A subgraph used by several
-  nodes is one shared definition, so switching its groups affects every copy.
+  `root graph` (default on) lists the groups of the graph the node is in. Switched off, it lists the groups
+  inside subgraphs instead, with the subgraph name above them, so a detailer group can be switched from
+  the root view; the `subgraph` list (filled in by the editor) limits that to one subgraph and the
+  subgraphs inside it. A subgraph used by several nodes is one shared definition, so switching its
+  groups affects every copy.
   A group counts as on while at least one of its nodes is active. The node itself never runs
   and is never toggled by its own group.
 
@@ -75,6 +84,7 @@ inserts, Esc closes. Not active inside `<lora:...>`. Settings are under
 **Settings → MooBox → Tag autocomplete**: on/off, minimum characters, number of
 suggestions, spaces instead of underscores (default on; `score_` tags and `^_^` keep
 their underscore), escaping `( )` and a trailing comma after the tag.
+The tag list is loaded the first time you type in such a field, not on page load.
 
 - **Tag Prompt (MooBox)**: type in the input field at the top, pick a suggestion
   (or press Enter for your own text) and the tag is added. The text field below stays
@@ -91,16 +101,6 @@ their underscore), escaping `( )` and a trailing comma after the tag.
   come from the `type` column of the loaded tag list (a1111 format); without that list,
   unknown tags (such as LoRA trigger words) go last, before the quality tags if those
   are at the end. The optional `trigger_words` input is sorted along.
-
-### Tag list
-
-The list is stored locally in `user/moobox/tags.csv`. Fill it through the
-**Tag list** setting: paste the whole list and click **Save list**, or click
-**Download from URL** (only then is the configured URL fetched; the default URL is the
-a1111-tagcomplete `danbooru.csv`). Formats: `tag`, `tag,count` or
-`tag,type,count,"alias1,alias2"`.
-
-## LoRA loader details
 
 ### Jobs
 
@@ -120,6 +120,17 @@ The progress line shows the running local build, otherwise a running external jo
 (teal). Click it to open the Jobs tab. It is an estimate based on finished nodes,
 never remaining time. Only node ids, titles, class types, status and progress are shared
 with other clients; inputs, outputs and errors are not, and client ids only as a hash.
+
+### Tag list
+
+The list is stored locally in `user/moobox/tags.csv`. Fill it through the
+**Tag list** setting: paste the whole list and click **Save list**, or click
+**Download from URL** (only then is the configured URL fetched; the default URL is the
+a1111-tagcomplete `danbooru.csv`). Formats: `tag`, `tag,count` or
+`tag,type,count,"alias1,alias2"`. A list larger than 256 KB is not shown in the setting;
+paste a complete new list to replace it.
+
+## LoRA loader details
 
 A new loader node defaults to **LoRA Manager** if it is installed, otherwise to ComfyUI,
 and the LoRA Manager option cannot be selected. Saved workflows keep their own choice.
@@ -151,7 +162,9 @@ python3 migrate_workflow.py /path/to/workflow.json
 This writes `workflow-moobox.json`, keeps the connections and selections and sets the
 converted loaders to **LoRA Manager**. rgthree's Fast Groups Bypasser and Muter become
 **Groups Toggle** (those with a connected output are left alone); other rgthree nodes are listed. The original workflow is left untouched.
-A connected text input needs manual conversion.
+A loader with a connected text or `lora_stack` input is refused and needs manual conversion;
+nothing is written then, and an existing output file is never overwritten. rgthree settings
+without a Groups Toggle equivalent (toggle restriction, navigation, custom sort alphabet) are listed.
 
 Keep a backup of this folder. ComfyUI updates may, as with other node packs, require changes.
 
@@ -161,6 +174,9 @@ Keep a backup of this folder. ComfyUI updates may, as with other node packs, req
 python -m unittest discover -s tests -p "test_*.py"
 node --experimental-vm-modules --test tests/*.test.mjs
 ```
+
+Without Node.js, `bun test tests` runs the same JavaScript tests. The Python tests need an
+interpreter with `aiohttp`, such as ComfyUI's own (for example `.venv\Scripts\python.exe`).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the layout of the pack and how to add a node.
 

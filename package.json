@@ -2,5 +2,5 @@
   "name": "comfyui-moobox",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node --experimental-vm-modules --test tests/*.test.mjs" }
+  "scripts": { "test": "node --experimental-vm-modules --test tests/*.test.mjs", "test:bun": "bun test tests" }
 }
