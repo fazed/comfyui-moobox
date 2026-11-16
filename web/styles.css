@@ -235,3 +235,5 @@
 .kt-group-go { appearance: none; border: 0; background: transparent; color: var(--kt-muted); cursor: pointer; font-size: 14px; }
 .kt-group-go:hover { color: var(--kt-accent); }
 .kt-group-path { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--kt-line); color: var(--kt-muted); font-size: 11px; }
+.kt-groups-bar { display: flex; justify-content: flex-end; flex-shrink: 0; }
+.kt-groups-list { display: flex; flex-direction: column; gap: 4px; }

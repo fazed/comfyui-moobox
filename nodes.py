@@ -191,12 +191,12 @@ class MooBoxGroupsToggle(io.ComfyNode):
                 io.String.Input("match_title", default="", tooltip="Only show groups whose title matches this text or regular expression."),
                 io.String.Input("match_colors", default="", tooltip="Only show groups with these colors: ComfyUI color names or hex values, comma separated."),
                 io.Combo.Input("sort", options=["position", "alphanumeric"]),
-                io.Boolean.Input("all_graphs", default=True, tooltip="Also list the groups inside subgraphs and switch their nodes."),
-                io.Combo.Input("match_subgraph", options=["(all)"], tooltip="With all_graphs: only list the groups of this subgraph (and the subgraphs inside it). The list is filled in the editor; (all) lists every graph, root included."),
+                io.Boolean.Input("root_graph", display_name="root graph", default=True, tooltip="On: list the groups of the graph this node is in. Off: list the groups inside subgraphs instead and choose one below."),
+                io.Combo.Input("match_subgraph", display_name="subgraph", options=["(all)"], tooltip="Only list the groups of this subgraph and the subgraphs inside it. The list is filled in by the editor."),
             ],
             outputs=[],
         )
 
     @classmethod
-    def execute(cls, action, match_title, match_colors, sort, all_graphs, match_subgraph):
+    def execute(cls, action, match_title, match_colors, sort, root_graph, match_subgraph):
         return io.NodeOutput()
