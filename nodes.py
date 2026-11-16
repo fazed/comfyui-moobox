@@ -42,14 +42,13 @@ class MooBoxLoraLoader(io.ComfyNode):
                 io.Model.Input("model"),
                 io.String.Input("loras", default="[]", extra_dict={"widgetType": "MOOBOX_LORAS"}),
                 io.Clip.Input("clip", optional=True),
-                io.Custom("LORA_STACK").Input("lora_stack", optional=True),
                 io.Combo.Input("loader", options=["ComfyUI", "LoRA Manager"], default="ComfyUI", advanced=True),
             ],
             outputs=[io.Model.Output("MODEL"), io.Clip.Output("CLIP"), io.String.Output("trigger_words"), io.String.Output("loaded_loras")],
         )
 
     @classmethod
-    def execute(cls, model, loras, clip=None, lora_stack=None, loader="ComfyUI"):
+    def execute(cls, model, loras, clip=None, loader="ComfyUI"):
         if loader not in ("ComfyUI", "LoRA Manager"):
             raise ValueError("Unknown LoRA loader.")
         entries = read_state(loras)
@@ -58,16 +57,12 @@ class MooBoxLoraLoader(io.ComfyNode):
             if manager is None:
                 raise RuntimeError("LoRA Manager is unavailable. Install it or choose the ComfyUI loader.")
             instance = manager()
-            result = getattr(instance, instance.FUNCTION)(model=model, text="", loras=entries, clip=clip, lora_stack=lora_stack)
+            result = getattr(instance, instance.FUNCTION)(model=model, text="", loras=entries, clip=clip)
             return io.NodeOutput(*result, ui={"trigger_words": [result[2]]})
 
         native = nodes.LoraLoader()
         loaded = []
         words = []
-        for name, model_strength, clip_strength in lora_stack or []:
-            resolve_lora(name)
-            model, clip = native.load_lora(model, clip, name, model_strength, clip_strength)
-            loaded.append(f"<lora:{name}:{model_strength:g}:{clip_strength:g}>")
         for entry in entries:
             if not entry.get("active", True):
                 continue

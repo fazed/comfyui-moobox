@@ -47,18 +47,12 @@ class LoaderTests(unittest.TestCase):
         output = pack.MooBoxLoraLoader.execute("model", "[]")
         self.assertEqual(output.result, ("model", None, "", ""))
 
-    def test_stack_is_loaded_before_owned_entries(self):
-        pack.MooBoxLoraLoader.execute("model", '[{"name":"beta.safetensors"}]', lora_stack=[("alpha.safetensors", 0.3, 0.5)])
-        calls = native.LoraLoader.return_value.load_lora.call_args_list
-        self.assertEqual(calls[0].args, ("model", None, "alpha.safetensors", 0.3, 0.5))
-        self.assertEqual(calls[1].args[2], "beta.safetensors")
-
     def test_optional_manager_uses_registered_public_node_contract(self):
         instance = types.SimpleNamespace(FUNCTION="load_loras", load_loras=Mock(return_value=("m", "c", "words", "loaded")))
         native.NODE_CLASS_MAPPINGS["Lora Loader (LoraManager)"] = Mock(return_value=instance)
         output = pack.MooBoxLoraLoader.execute("model", "[]", loader="LoRA Manager")
         self.assertEqual(output.result, ("m", "c", "words", "loaded"))
-        instance.load_loras.assert_called_once_with(model="model", text="", loras=[], clip=None, lora_stack=None)
+        instance.load_loras.assert_called_once_with(model="model", text="", loras=[], clip=None)
 
     def test_missing_manager_fails_with_actionable_error(self):
         with self.assertRaisesRegex(RuntimeError, "choose the ComfyUI loader"):
