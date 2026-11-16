@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Open LoRA · MooBox</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body class="kt-manager-page">
+  <main>
+    <h1>Open in LoRA Manager</h1>
+    <p id="status" role="status">Opening your local library…</p>
+    <div id="choices"></div>
+    <a id="library">Open the LoRA Manager library</a>
+  </main>
+  <script type="module">
+    import { openManagerPage } from "./manager.js";
+    openManagerPage();
+  </script>
+</body>
+</html>
