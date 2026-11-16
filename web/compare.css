@@ -15,7 +15,7 @@
   font: 13px/1.4 system-ui, sans-serif;
 }
 .kc-root * { box-sizing: border-box; }
-.kc-controls { flex-direction: row; align-items: center; padding: 6px 8px; }
+.kc-controls { flex-direction: row; flex-wrap: wrap; align-items: center; padding: 6px 8px; }
 .kc-controls label { display: flex; align-items: center; gap: 4px; color: #9aa9bc; }
 .kc-controls select {
   color: inherit;

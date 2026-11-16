@@ -178,8 +178,7 @@ function compareWidgets(node) {
   wrap.append(controls, view);
   wrap.addEventListener("pointerdown", (event) => event.stopPropagation());
   wrap.addEventListener("wheel", (event) => event.stopPropagation());
-  const widget = node.addDOMWidget("compare", "custom", wrap, { serialize: false, hideInPanel: true, getMinHeight: () => 360 });
-  widget.computeLayoutSize = () => ({ minHeight: 360, minWidth: 360 });
+  node.addDOMWidget("compare", "custom", wrap, { serialize: false, hideInPanel: true, getMinHeight: () => 160 });
   node.setSize([Math.max(node.size[0], 480), Math.max(node.size[1], 460)]);
   show();
   return {
