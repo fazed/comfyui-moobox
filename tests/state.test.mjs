@@ -42,9 +42,9 @@ test('default_active affects only new groups', () => {
 });
 
 test('duplicate groups keep independent selections and identity order', () => {
-  let state = reconcileWords({ groups: [] }, 'alpha,, alpha');
+  let state = reconcileWords({ groups: [] }, 'alpha,, alpha', true);
   state.groups[1].active = false;
-  state = reconcileWords(state, state.source);
+  state = reconcileWords(state, state.source, true);
   assert.deepEqual(state.groups.map((group) => group.active), [true, false]);
 });
 
