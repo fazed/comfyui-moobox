@@ -12,5 +12,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the layout of this pack and how to ad
 - No Internet access, model downloads, or writes to model files or metadata. The only exception is the tag list download, which runs only when the user clicks Download in the tag autocomplete settings.
 - Tag autocomplete attaches to textareas through document-level listeners so it works in Nodes 2.0 (Vue) and legacy nodes; never hook widget constructors.
 - The jobs monitor only observes. Stopping is limited to jobs of this browser tab and goes through ComfyUI's own cancel endpoint; external jobs stay read-only.
+- No polling timers and no document-wide click or key listeners to refresh the UI: ComfyUI reports no group, position or mode changes. Refresh on creation, load, widget callbacks, the node's own actions and a Refresh button. Every listener, timer, observer, popup or menu a node starts is removed in `onRemoved` or `onRemove` and that removal is tested.
+- Compute which nodes are inside a group from `pos` and `size`; `recomputeInsideNodes` and `boundingRect` are wrong for subgraphs that were never opened.
+- Append new widgets at the end, never reorder `widgets_values`, and ship the conversion in `migrate_workflow.py` with any change that alters what saved values mean.
+- Do side effects such as advancing seeds only after ComfyUI accepted the prompt.
+- Read the lessons in CONTRIBUTING.md before writing a node, and test every change yourself in both Nodes 2.0 and the classic view, or state what you could not test.
 - Run the Python and JavaScript tests documented in README.md after behavior changes.
 - Do not migrate or overwrite user workflows automatically; the converter writes new files.
