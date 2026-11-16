@@ -46,3 +46,7 @@
 .kc-wrap > .kc-root { height: auto; }
 .kc-controls { flex: 0 0 auto; }
 .kc-view { flex: 1 1 0; }
+.kc-frame[data-mode="blink"] > img:nth-of-type(2), .kc-frame[data-mode="blink"] > .kc-tag:nth-of-type(2) { animation: kc-blink-b 1.2s step-end infinite; }
+.kc-frame[data-mode="blink"] > .kc-tag:nth-of-type(1) { animation: kc-blink-a 1.2s step-end infinite; }
+@keyframes kc-blink-a { 0% { visibility: visible; } 50% { visibility: hidden; } }
+@keyframes kc-blink-b { 0% { visibility: hidden; } 50% { visibility: visible; } }

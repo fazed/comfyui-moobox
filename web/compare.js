@@ -2,7 +2,6 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
 const COMPARE = "MooBoxImageCompare";
-const BLINK_MS = 600;
 const MODES = {
   ab: ["A/B", "Click the image to switch between A and B."],
   slider: ["Slider", "Drag the line: A on the left, B on the right."],
@@ -36,7 +35,6 @@ function setSource(img, url) {
 function compareWidgets(node) {
   const state = node.properties.compare ??= { a: null, b: null, mode: "slider", position: 50 };
   const files = new Map();
-  let blink;
 
   const wrap = element("div", "kc-wrap");
   const controls = element("div", "kc-root kc-controls");
@@ -89,8 +87,11 @@ function compareWidgets(node) {
     const height = natural.naturalHeight * scale;
     Object.assign(frame.style, { width: `${width}px`, height: `${height}px`, left: `${(stage.clientWidth - width) / 2}px`, top: `${(stage.clientHeight - height) / 2}px` });
   };
+  // The difference is only recomputed after A or B loaded new pixels; reading full-resolution pixels is slow.
+  let stale = true;
   const drawDiff = () => {
-    if (state.mode !== "diff" || !imgA.naturalWidth || !imgB.naturalWidth || !imgA.complete || !imgB.complete) return;
+    if (!stale || state.mode !== "diff" || !imgA.naturalWidth || !imgB.naturalWidth || !imgA.complete || !imgB.complete) return;
+    stale = false;
     const { naturalWidth: width, naturalHeight: height } = imgA;
     diff.width = width;
     diff.height = height;
@@ -114,7 +115,7 @@ function compareWidgets(node) {
   };
   const paint = () => {
     const slider = state.mode === "slider";
-    const showB = state.mode === "ab" || state.mode === "blink" ? state.showB : true;
+    const showB = state.mode === "ab" ? state.showB : true;
     imgA.style.visibility = state.mode === "diff" ? "hidden" : "visible";
     imgB.style.visibility = state.mode === "diff" || !showB ? "hidden" : "visible";
     imgB.style.clipPath = slider ? `inset(0 0 0 ${state.position}%)` : "none";
@@ -129,12 +130,11 @@ function compareWidgets(node) {
     tagA.style.left = "6px";
     tagB.style.right = sideBySide ? "6px" : "";
     tagB.style.left = sideBySide ? "" : "6px";
-    const single = state.mode === "ab" || state.mode === "blink";
+    const single = state.mode === "ab";
     tagA.style.display = single && showB ? "none" : "";
     tagB.style.display = state.mode === "diff" || (single && !showB) ? "none" : "";
   };
   const show = () => {
-    clearInterval(blink);
     const indexes = connected();
     if (!indexes.includes(state.a)) state.a = indexes[0] ?? null;
     if (!indexes.includes(state.b) || (state.b === state.a && indexes.length > 1)) state.b = indexes.find((index) => index !== state.a) ?? state.a;
@@ -150,15 +150,15 @@ function compareWidgets(node) {
     frame.dataset.mode = state.mode;
     setSource(imgA, imageUrl(files.get(state.a)));
     setSource(imgB, imageUrl(files.get(state.b)));
-    if (state.mode === "blink") blink = setInterval(() => { state.showB = !state.showB; paint(); }, BLINK_MS);
     paint();
     drawDiff();
     fit();
   };
-  const loaded = () => { paint(); fit(); drawDiff(); };
+  const loaded = () => { stale = true; paint(); fit(); drawDiff(); };
   imgA.addEventListener("load", loaded);
   imgB.addEventListener("load", loaded);
-  new ResizeObserver(fit).observe(stage);
+  const resizer = new ResizeObserver(fit);
+  resizer.observe(stage);
 
   const move = (event) => {
     const box = frame.getBoundingClientRect();
@@ -184,7 +184,7 @@ function compareWidgets(node) {
   show();
   return {
     refresh: show,
-    stop: () => clearInterval(blink),
+    stop: () => resizer.disconnect(),
     load(saved) {
       files.clear();
       for (const file of saved) files.set(Number(file.name.slice(5)), file);
