@@ -4,6 +4,7 @@ import argparse
 import copy
 import json
 import re
+import sys
 from collections import defaultdict, deque
 from pathlib import Path
 
@@ -11,6 +12,8 @@ from logic import split_words
 
 
 GROUP_NODES = {"Fast Groups Bypasser (rgthree)": "bypass", "Fast Groups Muter (rgthree)": "mute"}
+# rgthree settings without a Groups Toggle equivalent, with their rgthree defaults.
+DROPPED_SETTINGS = {"toggleRestriction": "default", "showNav": True, "customSortAlphabet": ""}
 
 
 def unweight(text: str) -> tuple[str, float]:
@@ -18,9 +21,10 @@ def unweight(text: str) -> tuple[str, float]:
     return (match[1], float(match[2])) if match else (text, 1)
 
 
-def convert_workflow(workflow: dict) -> tuple[dict, int]:
+def convert_workflow(workflow: dict) -> tuple[dict, int, list[str]]:
     result = copy.deepcopy(workflow)
     count = 0
+    dropped = []
 
     def convert(graph):
         nonlocal count
@@ -29,10 +33,14 @@ def convert_workflow(workflow: dict) -> tuple[dict, int]:
             if kind in GROUP_NODES and not any(output.get("links") for output in node.get("outputs", [])):
                 properties = node.setdefault("properties", {})
                 sort = properties.get("sort")
+                name = f"{node.get('title') or kind} (node {node.get('id')})"
+                dropped.extend(f"{name}: {key} = {properties[key]!r}" for key, default in DROPPED_SETTINGS.items() if properties.get(key, default) != default)
+                if sort == "custom alphabet":
+                    dropped.append(f"{name}: sort 'custom alphabet' became 'position'")
                 node["type"] = "MooBoxGroupsToggle"
                 node["inputs"] = []
                 node["outputs"] = []
-                node["widgets_values"] = [GROUP_NODES[kind], properties.get("matchTitle", ""), properties.get("matchColors", ""), "alphanumeric" if sort == "alphanumeric" else "position", properties.get("showAllGraphs", True), "(all)"]
+                node["widgets_values"] = [GROUP_NODES[kind], properties.get("matchTitle", ""), properties.get("matchColors", ""), "alphanumeric" if sort == "alphanumeric" else "position", True, "(all)"]
                 node["properties"] = {"Node name for S&R": node["type"]}
                 count += 1
                 continue
@@ -43,8 +51,9 @@ def convert_workflow(workflow: dict) -> tuple[dict, int]:
             named = dict(zip(names, values))
             named.update(node.get("widgets_values_named", {}))
             if kind == "Lora Loader (LoraManager)":
-                if any(item.get("name") == "text" and item.get("link") is not None for item in node.get("inputs", [])):
-                    raise ValueError("A LoRA Loader has a linked text input; convert that node manually.")
+                for item in node.get("inputs", []):
+                    if item.get("name") in ("text", "lora_stack") and item.get("link") is not None:
+                        raise ValueError(f"A LoRA Loader has a linked {item['name']} input; convert that node manually.")
                 entries = named.get("loras")
                 if entries is None:
                     entries = next((value for value in reversed(values) if isinstance(value, list)), [])
@@ -91,7 +100,7 @@ def convert_workflow(workflow: dict) -> tuple[dict, int]:
             convert(subgraph)
 
     convert(result)
-    return result, count
+    return result, count, dropped
 
 
 def main():
@@ -100,11 +109,18 @@ def main():
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     output = args.output or args.workflow.with_name(args.workflow.stem + "-moobox.json")
-    converted, count = convert_workflow(json.loads(args.workflow.read_text(encoding="utf-8-sig")))
-    with output.open("x", encoding="utf-8") as handle:
-        json.dump(converted, handle, ensure_ascii=False, indent=2)
-        handle.write("\n")
+    try:
+        converted, count, dropped = convert_workflow(json.loads(args.workflow.read_text(encoding="utf-8-sig")))
+        with output.open("x", encoding="utf-8") as handle:
+            json.dump(converted, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+    except FileExistsError:
+        sys.exit(f"{output} already exists. Remove it or choose another name with --output.")
+    except ValueError as error:
+        sys.exit(f"Nothing written: {error}")
     print(f"Converted {count} nodes: {output}")
+    if dropped:
+        print("Settings without a Groups Toggle equivalent (dropped):\n  " + "\n  ".join(dropped))
     left = sorted({match for match in re.findall(r'"type": "([^"]*\(rgthree\))"', output.read_text(encoding="utf-8"))})
     if left:
         print("Still rgthree (no MooBox replacement): " + ", ".join(left))
