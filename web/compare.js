@@ -122,8 +122,9 @@ function compareWidgets(node) {
     diff.style.display = state.mode === "diff" ? "" : "none";
     line.style.display = slider ? "" : "none";
     line.style.left = `${state.position}%`;
-    tagA.textContent = state.mode === "diff" ? "Diff" : `${state.a + 1}`;
-    tagB.textContent = state.mode === "blend" ? `${state.b + 1} · ${Math.round(state.position)}%` : `${state.b + 1}`;
+    const size = (img) => img.naturalWidth ? ` · ${img.naturalWidth}×${img.naturalHeight}` : "";
+    tagA.textContent = state.mode === "diff" ? "Diff" : `${state.a + 1}${size(imgA)}`;
+    tagB.textContent = `${state.b + 1}${size(imgB)}${state.mode === "blend" ? ` · ${Math.round(state.position)}%` : ""}`;
     const sideBySide = slider || state.mode === "blend";
     tagA.style.left = "6px";
     tagB.style.right = sideBySide ? "6px" : "";
@@ -154,7 +155,7 @@ function compareWidgets(node) {
     drawDiff();
     fit();
   };
-  const loaded = () => { fit(); drawDiff(); };
+  const loaded = () => { paint(); fit(); drawDiff(); };
   imgA.addEventListener("load", loaded);
   imgB.addEventListener("load", loaded);
   new ResizeObserver(fit).observe(stage);
