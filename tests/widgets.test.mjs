@@ -46,6 +46,7 @@ async function harness(fetchApi) {
     '../../scripts/app.js': { app: { registerExtension: (value) => { extension = value; } } },
     '../../scripts/api.js': { api: { fetchApi, apiURL: (path) => path } },
     './state.js': state,
+    './styles.js': {},
   };
   await module.link((specifier) => {
     const exports = mocks[specifier];
@@ -187,6 +188,45 @@ test('every LoRA has an isolated browser link to the exact manager lookup', asyn
   assert.equal(link.target, '_blank');
   assert.ok(link.rel.includes('noopener'));
   assert.equal(widget.computeLayoutSize().minHeight, 340);
+  widget.onRemove();
+});
+
+test('a connected trigger node never sends its saved source, an unconnected one does', async () => {
+  const { node, extension } = await harness();
+  const { widget } = extension.getCustomWidgets().MOOBOX_TRIGGERS(node, 'selection');
+  widget.value = JSON.stringify(state.reconcileWords({ groups: [] }, 'alpha,, beta', true));
+  node.inputs = [{ name: 'trigger_words', link: null }];
+  assert.equal(JSON.parse(widget.serializeValue()).source, 'alpha,, beta');
+  node.inputs[0].link = 3;
+  assert.equal(JSON.parse(widget.serializeValue()).source, '');
+  assert.equal(JSON.parse(widget.serializeValue()).groups.length, 2);
+  assert.equal(JSON.parse(widget.value).source, 'alpha,, beta');
+});
+
+test('absent groups can be forgotten on request', async () => {
+  const { node, extension } = await harness();
+  const { widget } = extension.getCustomWidgets().MOOBOX_TRIGGERS(node, 'selection');
+  widget.value = JSON.stringify(state.reconcileWords(state.reconcileWords({ groups: [] }, 'alpha,, beta'), 'alpha'));
+  labelled(widget.element, 'Remove saved selections of groups the source no longer contains').click();
+  assert.deepEqual(JSON.parse(widget.value).groups.map((group) => group.text), ['alpha']);
+  assert.equal(labelled(widget.element, 'Remove saved selections of groups the source no longer contains'), undefined);
+});
+
+test('loader re-renders only rewrite connected trigger nodes when the words change', async () => {
+  const { node, extension } = await harness();
+  let writes = 0;
+  const target = { comfyClass: 'MooBoxTriggerWords', widgets: [{ name: 'selection', get value() { return '{"source":"","groups":[]}'; }, set value(_) { writes++; } }] };
+  node.outputs = [{}, {}, { links: [1] }];
+  Object.assign(node.graph, { links: { 1: { target_id: 7 } }, getNodeById: () => target });
+  const { widget } = extension.getCustomWidgets().MOOBOX_LORAS(node, 'loras');
+  widget.value = JSON.stringify([{ name: 'alpha', strength: 1, clipStrength: 1, words: ['a'] }]);
+  const before = writes;
+  labelled(widget.element, 'Show link and CLIP settings for alpha').click();
+  assert.equal(writes, before);
+  const enable = labelled(widget.element, 'Enable alpha');
+  enable.checked = false;
+  enable.dispatchEvent(new Event('change'));
+  assert.equal(writes, before + 1);
   widget.onRemove();
 });
 

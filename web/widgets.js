@@ -1,14 +1,11 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { activeWords, addLora, reconcileWords, splitWords } from "./state.js";
+import "./styles.js";
 
 const LOADER = "MooBoxLoraLoader";
 const TRIGGERS = "MooBoxTriggerWords";
 const MANAGER_NODE = "Lora Loader (LoraManager)";
-const style = document.createElement("link");
-style.rel = "stylesheet";
-style.href = new URL("./styles.css", import.meta.url).href;
-document.head.append(style);
 
 function element(tag, className, text) {
   const el = document.createElement(tag);
@@ -190,7 +187,7 @@ function loaderWidget(node, name) {
   listPanel.append(listHeading, list);
   root.append(searchPanel, listPanel);
   let timer, controller, disposed = false, selecting = false;
-  let widget;
+  let widget, synced;
   let selected = 0;
   let dragFrom = -1;
   const expanded = new Set();
@@ -343,7 +340,9 @@ function loaderWidget(node, name) {
       list.append(card);
     });
     list.scrollTop = scroll;
-    syncConnected(node, activeWords(entries, node.mode));
+    const words = activeWords(entries, node.mode);
+    if (words !== synced) syncConnected(node, words);
+    synced = words;
   };
   const result = makeWidget(node, name, root, [], render);
   widget = result.widget;
@@ -431,6 +430,11 @@ function triggerWidget(node, name) {
       views.append(choice);
     }
     heading.append(element("span", "kt-title", "Trigger words"), element("span", "kt-badge", `${count}/${total} active`), views);
+    const absent = state.groups.length - visible.length;
+    if (absent) heading.append(button(`Forget ${absent} absent`, "Remove saved selections of groups the source no longer contains", () => {
+      const value = JSON.parse(widget.value);
+      change(node, widget, { ...value, groups: value.groups.filter((group) => group.present !== false) });
+    }));
     root.append(heading);
     const list = element("div", "kt-list");
     if (!visible.length) {
@@ -517,6 +521,11 @@ function triggerWidget(node, name) {
   };
   const result = makeWidget(node, name, root, { source: "", groups: [] }, render);
   widget = result.widget;
+  // ComfyUI drops the trigger_words input when the connected loader is bypassed or muted; the saved source must not stand in for it then.
+  widget.serializeValue = () => {
+    const value = JSON.parse(widget.value);
+    return JSON.stringify(node.inputs?.some((input) => input.name === "trigger_words" && input.link != null) ? { ...value, source: "" } : value);
+  };
   return result;
 }
 
