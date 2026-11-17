@@ -23,6 +23,11 @@
 .mbj-bar-small { height: 3px; margin-top: 7px; }
 .mbj-bar-small::-webkit-progress-value { background: #71c3bd; }
 .mbj-bar-small::-moz-progress-bar { background: #71c3bd; }
+progress.mbj-bar-small:indeterminate { opacity: 1; background: linear-gradient(90deg, #71c3bd00, #71c3bd, #71c3bd00) -67% 0 / 40% 100% no-repeat, #88888824; animation: mbj-slide 1.6s ease-in-out infinite; }
+progress.mbj-bar-small:indeterminate::-webkit-progress-bar { background: transparent; }
+progress.mbj-bar-small:indeterminate::-moz-progress-bar { background: transparent; }
+@keyframes mbj-slide { to { background-position: 167% 0, 0 0; } }
+@media (prefers-reduced-motion: reduce) { progress.mbj-bar-small:indeterminate { animation: none; background: #71c3bd66; } }
 .mbj-job-id { display: block; overflow-wrap: anywhere; font: 10px/1.5 ui-monospace, monospace; color: var(--mbj-muted); user-select: text; margin-top: 6px; }
 .mbj-count { background: #88888818; border-radius: 6px; min-width: 23px; padding: 1px 7px; text-align: center; font-size: 10px; }
 .mbj-queue-row { display: flex; gap: 12px; padding-top: 8px; font-size: 11px; }
@@ -72,8 +77,9 @@
 .mbj-widget-external .mbj-widget-fill { background: #71c3bd99; }
 .mbj-widget-label { position: relative; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
 .mbj-widget-idle .mbj-widget-label { color: var(--descrip-text, #9696a6); }
-.mbj-widget-count { min-width: 16px; padding: 2px 5px; border-radius: 8px; text-align: center; font-size: 10px; font-variant-numeric: tabular-nums; background: #7775ed55; }
-.mbj-widget-external-count { background: #71c3bd55; }
+.mbj-widget-count { min-width: 16px; padding: 1px 5px; border: 1px solid #7775ed; border-radius: 8px; text-align: center; font-size: 10px; font-variant-numeric: tabular-nums; background: #7775ed55; }
+.mbj-widget-external-count { border-color: #71c3bd; background: #71c3bd55; }
+.mbj-widget-waiting { border-style: dashed; background: none; color: var(--descrip-text, #9696a6); }
 .mbj-widget-count[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .mbj-widget-fill { transition: none; } }
 .mbj-widget-docking { outline: 2px solid #9c91ff; outline-offset: 2px; }

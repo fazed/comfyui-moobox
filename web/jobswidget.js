@@ -4,18 +4,31 @@ const POSITION_KEY = "moobox.jobs.widget";
 const MARGIN = 8;
 const DOCK_REACH = 220;
 
+// The queue runs one job at a time, so a group without a running job waits behind the other one.
+function chip(name, items, otherRunning) {
+  const running = items.filter(job => job.status === "running").length;
+  const queued = items.length - running;
+  if (queued && !running && otherRunning) {
+    const position = items.length === 1 ? items[0].position : null;
+    const other = name === "Local builds" ? "an external job" : "a local build";
+    return { count: items.length, waiting: true, title: `${name}: ${queued} waiting behind ${other}${position ? ` · queue position ${position}` : ""}` };
+  }
+  return { count: items.length, waiting: false, title: `${name}: ${running} running, ${queued} queued` };
+}
+
 export function widgetState(jobs, tag) {
   const active = jobs.filter(job => ["running", "queued"].includes(job.status));
   const job = barJob(jobs, tag);
   const percent = job ? overallProgress(job) : null;
   const node = job ? primaryNode(job) : null;
+  const mine = Boolean(job) && isLocal(job, tag);
   return {
     idle: !job,
     percent,
-    mine: Boolean(job) && isLocal(job, tag),
+    mine,
     label: !job ? "Idle" : [percent === null ? null : `${Math.floor(percent)}%`, node ? nodeName(job, node[0]) : "Running"].filter(Boolean).join(" · "),
-    local: active.filter(item => isLocal(item, tag)).length,
-    external: active.filter(item => !isLocal(item, tag)).length,
+    local: chip("Local builds", active.filter(item => isLocal(item, tag)), Boolean(job) && !mine),
+    external: chip("External jobs", active.filter(item => !isLocal(item, tag)), mine),
   };
 }
 
@@ -39,8 +52,6 @@ export function createWidget(store, openPanel, storage = globalThis.localStorage
   meter.append(fill, label);
   const local = element("span", "mbj-widget-count mbj-widget-local");
   const external = element("span", "mbj-widget-count mbj-widget-external-count");
-  local.title = "Local builds";
-  external.title = "External jobs";
   root.append(grip, meter, local, external);
   document.body.append(root);
 
@@ -68,9 +79,11 @@ export function createWidget(store, openPanel, storage = globalThis.localStorage
     root.classList.toggle("mbj-widget-external", !state.idle && !state.mine);
     root.classList.toggle("mbj-widget-idle", state.idle);
     meter.title = `${state.label} · click for details`;
-    for (const [el, count] of [[local, state.local], [external, state.external]]) {
-      el.hidden = count === 0;
-      el.textContent = String(count);
+    for (const [el, chip] of [[local, state.local], [external, state.external]]) {
+      el.hidden = chip.count === 0;
+      el.textContent = String(chip.count);
+      el.title = chip.title;
+      el.classList.toggle("mbj-widget-waiting", chip.waiting);
     }
     place();
   }

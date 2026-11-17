@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { acceptSnapshot, barJob, clientTag, createBars, createPanel, isLocal, nodeName, overallProgress, primaryNode, progress } from "../web/jobspanel.js";
+import { widgetState } from "../web/jobswidget.js";
 
 class Element {
   children = [];
@@ -70,6 +71,56 @@ test("the top bar prefers a running local build over an external job", () => {
   assert.equal(barJob([mine, external], "e40c292c"), mine);
   assert.equal(barJob([external, { ...mine, status: "queued" }], "e40c292c"), external);
   assert.equal(barJob([{ ...mine, status: "completed" }], "e40c292c"), null);
+});
+
+test("a running local build beats any number of external jobs, whatever the order", () => {
+  const mine = { prompt_id: "m", status: "running", client: "e40c292c" };
+  const runningExternal = { prompt_id: "x", status: "running", client: "11111111" };
+  const queuedExternal = { prompt_id: "y", status: "queued", client: "22222222" };
+  assert.equal(barJob([runningExternal, queuedExternal, mine], "e40c292c"), mine);
+  assert.equal(barJob([mine, runningExternal, { ...queuedExternal, status: "running" }], "e40c292c"), mine);
+  const state = widgetState([runningExternal, mine, queuedExternal], "e40c292c");
+  assert.equal(state.mine, true);
+  assert.equal(state.local.count, 1);
+  assert.equal(state.external.count, 2);
+});
+
+test("without a running local build the bars show the running external job", () => {
+  const runningExternal = { prompt_id: "x", status: "running", client: "11111111" };
+  const queuedExternal = { prompt_id: "y", status: "queued", client: "22222222" };
+  assert.equal(barJob([queuedExternal, runningExternal], "e40c292c"), runningExternal);
+  const queuedMine = { prompt_id: "m", status: "queued", client: "e40c292c" };
+  const state = widgetState([queuedMine, runningExternal], "e40c292c");
+  assert.equal(barJob([queuedMine, runningExternal], "e40c292c"), runningExternal);
+  assert.equal(state.mine, false);
+  assert.equal(state.local.count, 1);
+  assert.equal(state.external.count, 1);
+});
+
+test("widget chips mark the job type that waits behind the running one", () => {
+  const tag = "e40c292c";
+  const node_types = { 1: "easy sleep" };
+  const mine = { prompt_id: "m", status: "running", client: tag, node_types, nodes: { 1: { value: 0, max: 1 } } };
+  const external = { prompt_id: "x", status: "running", client: "11111111", node_types, nodes: { 1: { value: 0, max: 1 } } };
+
+  let state = widgetState([mine, { ...external, status: "queued", position: 1 }], tag);
+  assert.equal(state.label, "0% · easy sleep");
+  assert.deepEqual([state.local.count, state.local.waiting], [1, false]);
+  assert.deepEqual([state.external.count, state.external.waiting], [1, true]);
+  assert.match(state.external.title, /waiting behind a local build · queue position 1/);
+
+  state = widgetState([{ ...mine, status: "queued", position: 1 }, external], tag);
+  assert.equal(state.mine, false);
+  assert.deepEqual([state.local.count, state.local.waiting], [1, true]);
+  assert.equal(state.external.waiting, false);
+  assert.match(state.local.title, /waiting behind an external job/);
+
+  state = widgetState([external, { ...external, prompt_id: "y", status: "queued", position: 1 }], tag);
+  assert.deepEqual([state.local.count, state.external.count, state.external.waiting], [0, 2, false]);
+  assert.equal(state.external.title, "External jobs: 1 running, 1 queued");
+
+  state = widgetState([{ ...mine, status: "completed" }], tag);
+  assert.deepEqual([state.idle, state.label, state.local.count, state.external.count], [true, "Idle", 0, 0]);
 });
 
 test("bars show progress where the mode says and hide when idle", () => {
