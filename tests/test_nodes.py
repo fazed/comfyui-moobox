@@ -1,10 +1,15 @@
+import importlib
 import importlib.util
 import json
 import sys
+import tempfile
 import types
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
+
+import torch
+from PIL import Image
 
 
 class Output:
@@ -154,3 +159,35 @@ class IllustriousResolutionTests(unittest.TestCase):
     def test_unknown_label_raises(self):
         with self.assertRaises(KeyError):
             pack.MooBoxIllustriousResolution.execute("Square 512 x 512")
+
+
+class PreviewImagesTests(unittest.TestCase):
+    # Loads compare.py against the real ComfyUI API so the previews are really written.
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(root.parents[1]))
+        spec = importlib.util.spec_from_file_location("moobox_test_compare", root / "compare.py")
+        cls.compare = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.compare)
+        cls.paths = importlib.import_module("folder_paths")
+        cls.io = importlib.import_module("comfy_api.latest").io
+
+    def test_schema_is_v3_output_node_with_autogrow_images(self):
+        schema = self.compare.MooBoxPreviewImages.define_schema()
+        self.assertEqual((schema.node_id, schema.category, schema.is_output_node, schema.outputs), ("MooBoxPreviewImages", "MooBox/Utility", True, []))
+        self.assertIsInstance(schema.inputs[0], self.io.Autogrow.Input)
+        template = schema.inputs[0].template
+        self.assertIsInstance(template.input, self.io.Image.Input)
+        self.assertEqual((template.prefix, template.min, template.max), ("image", 1, 100))
+
+    def test_all_images_of_all_inputs_are_saved_in_input_order(self):
+        first, second = torch.rand(2, 8, 8, 3), torch.rand(3, 16, 12, 3)
+        with tempfile.TemporaryDirectory() as temp, patch.object(self.paths, "temp_directory", temp):
+            files = self.compare.MooBoxPreviewImages.execute({"image1": second, "image0": first}).ui["previews"]
+            self.assertEqual([file["type"] for file in files], ["temp"] * 5)
+            self.assertEqual(len({file["filename"] for file in files}), 5)
+            sizes = []
+            for file in files:
+                with Image.open(Path(temp, file["subfolder"], file["filename"])) as image:
+                    sizes.append(image.size)
+        self.assertEqual(sizes, [(8, 8)] * 2 + [(12, 16)] * 3)

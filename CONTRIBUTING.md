@@ -8,11 +8,11 @@ Thanks for helping out. Please also read [AGENTS.md](AGENTS.md), which holds the
 | --- | --- |
 | `__init__.py` | Registers all nodes with ComfyUI (`get_node_list`). |
 | `nodes.py` | Node classes (V3 schemas): LoRA Loader, Trigger Words, tag prompts, Seeds. |
-| `compare.py` | Image Compare node. |
+| `compare.py` | Image Compare and Preview Images nodes. |
 | `logic.py` | Pure logic without ComfyUI imports (tags, trigger words, prompts), easy to test. |
 | `jobs.py` | Read-only job monitor (snapshot route and `moobox_jobs.snapshot` event). |
 | `routes.py` | Local HTTP endpoints (`/moobox-lora/...`, `/moobox-tags`). |
-| `web/` | Frontend. `widgets.js` (loader and triggers), `seeds.js` and `seedstate.js` (Seeds), `groups.js` and `groupstate.js` (Groups Toggle), `jobs.js` and `jobspanel.js` (Jobs tab and top bar), `jobswidget.js` (jobs widget in the action bar), `compare.js` and `compare.css`, `autocomplete.js`, `tags.js`, `tagprompt.js`, `state.js`, `manager.js`, `styles.css` (linked once through `styles.js`), `jobs.css`. Modules named `*state.js` hold pure logic and are tested without ComfyUI. |
+| `web/` | Frontend. `widgets.js` (loader and triggers), `seeds.js` and `seedstate.js` (Seeds), `groups.js` and `groupstate.js` (Groups Toggle), `jobs.js` and `jobspanel.js` (Jobs tab and top bar), `jobswidget.js` (jobs widget in the action bar), `compare.js` and `compare.css`, `preview.js` and `previewstate.js` (Preview Images), `autocomplete.js`, `tags.js`, `tagprompt.js`, `state.js`, `manager.js`, `styles.css` (linked once through `styles.js`), `jobs.css`. Modules named `*state.js` hold pure logic and are tested without ComfyUI. |
 | `migrate_workflow.py` | Converts an exported workflow into a copy that uses the MooBox nodes. |
 | `tests/` | Python tests (`test_*.py`) and JavaScript tests (`*.test.mjs`). |
 

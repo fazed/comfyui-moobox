@@ -81,6 +81,12 @@ Restart ComfyUI afterwards. No extra packages or build step are needed.
   connected, the run stops with a clear error naming that input. Unlike the core If/Else Switch its types are fixed to IMAGE, so running
   the workflow does not change the saved workflow.
 
+- **Preview Images (MooBox)**: connect one or more images (a new input appears automatically);
+  every image of every input, batches included, is shown in the node one at a time in input order.
+  The arrow buttons step through them and wrap around at the ends; the counter shows the position.
+  A new run starts at the first image again. Like Image Compare, the previews are not stored in the
+  workflow and only show again after the next run.
+
 ### MooBox / Prompt
 
 Type in a text field of a node (Nodes 2.0 and classic) and suggestions from your
