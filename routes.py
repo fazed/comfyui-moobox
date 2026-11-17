@@ -6,7 +6,10 @@ import os
 import struct
 
 import aiohttp
+import psutil
+import torch
 from aiohttp import web
+import comfy.model_management
 import comfy.utils
 import folder_paths
 from server import PromptServer
@@ -92,6 +95,25 @@ async def preview(request: web.Request) -> web.Response:
     if path is None:
         raise web.HTTPNotFound()
     return web.FileResponse(path, headers={"Cache-Control": "max-age=300"})
+
+
+# cpu_percent(interval=None) measures since the previous call; this first call sets the baseline.
+psutil.cpu_percent(interval=None)
+
+
+def memory_usage(device) -> dict[str, int]:
+    total = comfy.model_management.get_total_memory(device)
+    return {"used": total - comfy.model_management.get_free_memory(device), "total": total}
+
+
+@PromptServer.instance.routes.get("/moobox-system")
+async def system(request: web.Request) -> web.Response:
+    device = comfy.model_management.get_torch_device()
+    return web.json_response({
+        "cpu": psutil.cpu_percent(interval=None),
+        "ram": memory_usage(torch.device("cpu")),
+        "vram": None if device.type == "cpu" else memory_usage(device),
+    })
 
 
 def save_tags(data: bytes) -> None:

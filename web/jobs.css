@@ -83,5 +83,12 @@ progress.mbj-bar-small:indeterminate::-moz-progress-bar { background: transparen
 .mbj-widget-count[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .mbj-widget-fill { transition: none; } }
 .mbj-widget-docking { outline: 2px solid #9c91ff; outline-offset: 2px; }
+.mbj-widget-stats { display: flex; gap: 8px; height: 24px; padding: 0 6px; border: 0; border-left: 1px solid #88888830; background: none; color: inherit; font: inherit; cursor: pointer; }
+.mbj-widget-stat { display: grid; grid-template-columns: auto auto; align-content: center; column-gap: 4px; row-gap: 3px; min-width: 52px; }
+.mbj-widget-stat-name { font-size: 9px; letter-spacing: .5px; color: var(--descrip-text, #9696a6); }
+.mbj-widget-stat-value { justify-self: end; font-size: 10px; font-variant-numeric: tabular-nums; }
+.mbj-widget-stat-bar { grid-column: 1 / -1; height: 2px; border-radius: 2px; overflow: hidden; background: #88888840; }
+.mbj-widget-stat-fill { display: block; height: 100%; width: 0; background: #71c3bd; transition: width .25s ease; }
+@media (prefers-reduced-motion: reduce) { .mbj-widget-stat-fill { transition: none; } }
 .mbj-topbar { display: flex; align-items: flex-start; }
 .mbj-topbar .mbj-bar-fill { flex: none; }

@@ -18,8 +18,12 @@ package = types.ModuleType("moobox_routes_pack")
 package.__path__ = [str(root)]
 utils = types.ModuleType("comfy.utils")
 utils.safetensors_header = Mock()
+management = types.ModuleType("comfy.model_management")
 comfy = types.ModuleType("comfy")
 comfy.utils = utils
+comfy.model_management = management
+torch = types.ModuleType("torch")
+torch.device = lambda kind: types.SimpleNamespace(type=kind)
 paths = types.ModuleType("folder_paths")
 server = types.ModuleType("server")
 server.PromptServer = types.SimpleNamespace(instance=types.SimpleNamespace(routes=web.RouteTableDef()))
@@ -28,7 +32,8 @@ jobs.install = Mock()
 pack_nodes = types.ModuleType("moobox_routes_pack.nodes")
 pack_nodes.TAGS_FILE = os.path.join(folder, "moobox", "tags.csv")
 pack_nodes.resolve_lora = Mock(side_effect=lambda name: f"/loras/{name}")
-modules = {"moobox_routes_pack": package, "comfy": comfy, "comfy.utils": utils, "folder_paths": paths, "server": server,
+modules = {"moobox_routes_pack": package, "comfy": comfy, "comfy.utils": utils, "comfy.model_management": management, "torch": torch,
+           "folder_paths": paths, "server": server,
            "moobox_routes_pack.jobs": jobs, "moobox_routes_pack.nodes": pack_nodes}
 with patch.dict(sys.modules, modules):
     spec = importlib.util.spec_from_file_location("moobox_routes_pack.routes", root / "routes.py")
@@ -165,6 +170,24 @@ class SearchPagingTests(unittest.TestCase):
     def test_garbage_offset_behaves_as_zero(self):
         for offset in ("", "abc", "-5", "1.5", " 3"):
             self.assertEqual(self.search(q="style", offset=offset)["names"], self.names[:50], offset)
+
+
+class SystemRouteTests(unittest.TestCase):
+    def system(self, device):
+        memory = {"cpu": (32, 20), "cuda": (24, 6)}
+        with patch.object(management, "get_torch_device", Mock(return_value=types.SimpleNamespace(type=device)), create=True), \
+                patch.object(management, "get_total_memory", Mock(side_effect=lambda dev: memory[dev.type][0]), create=True), \
+                patch.object(management, "get_free_memory", Mock(side_effect=lambda dev: memory[dev.type][1]), create=True), \
+                patch.object(routes.psutil, "cpu_percent", Mock(return_value=12.5)) as cpu:
+            result = json.loads(asyncio.run(routes.system(None)).text)
+        cpu.assert_called_once_with(interval=None)
+        return result
+
+    def test_reports_cpu_ram_and_vram_of_the_primary_device(self):
+        self.assertEqual(self.system("cuda"), {"cpu": 12.5, "ram": {"used": 12, "total": 32}, "vram": {"used": 18, "total": 24}})
+
+    def test_cpu_device_has_no_vram(self):
+        self.assertEqual(self.system("cpu")["vram"], None)
 
 
 if __name__ == "__main__":

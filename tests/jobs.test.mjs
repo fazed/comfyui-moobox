@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { acceptSnapshot, barJob, clientTag, createBars, createPanel, isLocal, nodeName, overallProgress, primaryNode, progress } from "../web/jobspanel.js";
-import { widgetState } from "../web/jobswidget.js";
+import { createWidget, statsState, widgetState } from "../web/jobswidget.js";
 
 class Element {
   children = [];
@@ -121,6 +121,62 @@ test("widget chips mark the job type that waits behind the running one", () => {
 
   state = widgetState([{ ...mine, status: "completed" }], tag);
   assert.deepEqual([state.idle, state.label, state.local.count, state.external.count], [true, "Idle", 0, 0]);
+});
+
+test("system stats show percentages, GB details and a dash for missing values", () => {
+  const GB = 1024 ** 3;
+  const [cpu, ram, vram] = statsState({ cpu: 12.4, ram: { used: 8 * GB, total: 32 * GB }, vram: { used: 30 * GB, total: 24 * GB } });
+  assert.deepEqual(cpu, { name: "CPU", percent: 12.4, value: "12%", title: "CPU 12%" });
+  assert.deepEqual([ram.percent, ram.value, ram.title], [25, "25%", "RAM 8.0 of 32.0 GB"]);
+  assert.deepEqual([vram.percent, vram.value], [100, "125%"]);
+  const offline = statsState(null);
+  assert.deepEqual(offline.map(item => [item.name, item.percent, item.value]), [["CPU", null, "—"], ["RAM", null, "—"], ["VRAM", null, "—"]]);
+  assert.equal(statsState({ cpu: 5, ram: { used: 1, total: 2 }, vram: null })[2].title, "VRAM not available");
+});
+
+test("widget stats load on creation, follow job updates at most once per second, refresh on click and stop on close", async () => {
+  const saved = Object.fromEntries(["document", "window", "MutationObserver", "setTimeout", "clearTimeout"].map(key => [key, globalThis[key]]));
+  class Node extends Element {
+    classList = { toggle() {}, remove() {} };
+    append(...children) { for (const child of children) child.parentElement = this; super.append(...children); }
+    prepend(child) { this.append(child); }
+  }
+  const timers = new Map();
+  let nextTimer = 0;
+  globalThis.setTimeout = (fn) => { timers.set(++nextTimer, fn); return nextTimer; };
+  globalThis.clearTimeout = (id) => timers.delete(id);
+  globalThis.document = { createElement: () => new Node(), body: new Node(), querySelector: () => null };
+  globalThis.window = { addEventListener() {}, removeEventListener() {} };
+  globalThis.MutationObserver = class { observe() {} disconnect() {} };
+  try {
+    const requests = [];
+    const api = { fetchApi: async (url, options) => { requests.push(options.signal); return { ok: true, json: async () => ({ cpu: 40, ram: { used: 1, total: 4 }, vram: null }) }; } };
+    const source = store([]);
+    const widget = createWidget(source, () => {}, api, null);
+    await new Promise(resolve => saved.setTimeout(resolve, 0));
+    const values = texts(document.body).filter(text => /%|—/.test(text));
+    assert.deepEqual(values, ["40%", "25%", "—"]);
+    assert.equal(requests.length, 1);
+
+    for (let i = 0; i < 5; i++) source.listeners.forEach(fn => fn());
+    assert.equal(timers.size, 1);
+    [...timers.values()][0]();
+    assert.equal(timers.size, 0);
+    assert.equal(requests.length, 2);
+
+    const button = all(document.body).find(node => node.className === "mbj-widget-stats");
+    button.onclick();
+    assert.equal(requests.length, 3);
+
+    source.listeners.forEach(fn => fn());
+    assert.equal(timers.size, 1);
+    widget.close();
+    assert.equal(timers.size, 0);
+    assert.equal(source.listeners.size, 0);
+    assert.ok(requests.every(signal => signal.aborted));
+  } finally {
+    Object.assign(globalThis, saved);
+  }
 });
 
 test("bars show progress where the mode says and hide when idle", () => {

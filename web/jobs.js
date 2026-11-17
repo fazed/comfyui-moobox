@@ -17,6 +17,9 @@ app.registerExtension({
     id: BAR_SETTING, category: ["MooBox", "Jobs", "Progress bar"], name: "Progress bar position",
     type: "combo", options: BAR_MODES, defaultValue: "Both", onChange: () => bars?.render(),
   }],
+  afterConfigureGraph() {
+    void widget?.refreshStats();
+  },
   setup() {
     const css = document.createElement("link");
     css.rel = "stylesheet";
@@ -25,7 +28,7 @@ app.registerExtension({
     const store = createStore(api);
     const openPanel = () => app.extensionManager.sidebarTab?.toggleSidebarTab?.(TAB);
     bars = createBars(document.body, store, openPanel, () => app.ui.settings.getSettingValue(BAR_SETTING));
-    widget = createWidget(store, openPanel);
+    widget = createWidget(store, openPanel, api);
     widget.setVisible(app.ui.settings.getSettingValue(WIDGET_SETTING));
     app.extensionManager.registerSidebarTab({
       id: TAB, icon: "icon-[lucide--activity]", title: "Jobs", tooltip: "Local builds and external jobs", type: "custom",
