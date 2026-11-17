@@ -85,9 +85,13 @@ progress.mbj-bar-small:indeterminate::-moz-progress-bar { background: transparen
 .mbj-widget-docking { outline: 2px solid #9c91ff; outline-offset: 2px; }
 .mbj-topbar { display: flex; align-items: flex-start; }
 .mbj-topbar .mbj-bar-fill { flex: none; }
-.mbj-stats { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 8px; border-radius: 8px; border: 1px solid #88888830; background: var(--comfy-menu-bg, #202027); color: var(--fg-color, #eee); font: 11px/1 system-ui, sans-serif; cursor: pointer; flex-shrink: 0; }
+.mbj-stats { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 8px; border-radius: 8px; border: 1px solid #88888830; background: var(--comfy-menu-bg, #202027); color: var(--fg-color, #eee); font: 11px/1 system-ui, sans-serif; flex-shrink: 0; }
 .mbj-stats[hidden] { display: none; }
 .mbj-stats-floating { position: fixed; top: 108px; right: 12px; z-index: 1000; box-shadow: 0 4px 14px #0006; }
+.mbj-stats-meters { display: flex; align-items: center; gap: 8px; height: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.mbj-stats-flush { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--descrip-text, #9696a6); cursor: pointer; }
+.mbj-stats-flush:hover:not(:disabled) { background: #88888830; color: inherit; }
+.mbj-stats-flush:disabled { opacity: .5; cursor: progress; }
 .mbj-stats-meter { display: grid; grid-template-columns: auto auto; align-content: center; column-gap: 4px; row-gap: 3px; min-width: 52px; }
 .mbj-stats-name { font-size: 9px; letter-spacing: .5px; color: var(--descrip-text, #9696a6); }
 .mbj-stats-value { justify-self: end; font-size: 10px; font-variant-numeric: tabular-nums; }

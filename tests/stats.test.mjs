@@ -8,6 +8,7 @@ class Node {
   style = {};
   parentElement = null;
   classList = { toggle() {} };
+  setAttribute(name, value) { this[name] = value; }
   append(...children) { for (const child of children) child.parentElement = this; this.children.push(...children); }
   prepend(child) { this.append(child); }
   remove() { this.parentElement?.children.splice(this.parentElement.children.indexOf(this), 1); this.parentElement = null; }
@@ -23,7 +24,7 @@ function setup() {
   globalThis.setInterval = (fn, ms) => { timers.set(++next, { fn, ms }); return next; };
   globalThis.clearInterval = id => timers.delete(id);
   const bar = new Node();
-  globalThis.document = { createElement: () => new Node(), body: new Node(), hidden: false, querySelector: () => bar };
+  globalThis.document = { createElement: () => new Node(), createElementNS: () => new Node(), body: new Node(), hidden: false, querySelector: () => bar };
   const requests = [];
   let cpu = 40;
   const api = { fetchApi: async (url, options) => { requests.push(options.signal); return { ok: true, json: async () => ({ cpu: cpu++, ram: { used: 1, total: 4 }, vram: null }) }; } };
@@ -66,13 +67,68 @@ test("stats dock in the action bar, fetch once per tick, skip while hidden, refr
     assert.equal(env.requests.length, 2);
     stats.setVisible(true);
 
-    env.bar.children[0].onclick();
+    env.bar.children[0].children[0].onclick();
     assert.equal(env.requests.length, 3);
 
     stats.close();
     assert.equal(env.timers.size, 0);
     assert.equal(env.bar.children.length, 0);
     assert.ok(env.requests.every(signal => signal.aborted));
+  } finally {
+    env.restore();
+  }
+});
+
+test("flush frees through core only with an empty queue, stays disabled meanwhile and shows refusals or failures in its title", async () => {
+  const env = setup();
+  try {
+    const fetchStats = env.api.fetchApi;
+    const posts = [];
+    let queue = { queue_running: [], queue_pending: [] };
+    let reply = { ok: true, status: 200 };
+    env.api.fetchApi = async (url, options) => {
+      if (url === "/queue") return { ok: true, json: async () => queue };
+      if (url !== "/free") return fetchStats(url, options);
+      posts.push([options.method, JSON.parse(options.body)]);
+      if (reply instanceof Error) throw reply;
+      return reply;
+    };
+    const stats = createStatsWidget(env.api, 0);
+    await flush();
+    const button = env.bar.children[0].children[1];
+    assert.equal(button.className, "mbj-stats-flush");
+    assert.equal(button["aria-label"], "Flush models from RAM and VRAM");
+
+    const click = async () => {
+      const done = button.onclick();
+      assert.equal(button.disabled, true);
+      await done;
+      await flush();
+      assert.equal(button.disabled, false);
+      return button.title;
+    };
+    assert.equal(await click(), "Flush models from RAM and VRAM");
+    assert.deepEqual(posts, [["POST", { unload_models: true, free_memory: true }]]);
+    assert.equal(env.requests.length, 2);
+
+    queue = { queue_running: [["job"]], queue_pending: [] };
+    assert.equal(await click(), "Cannot flush while jobs run");
+    queue = { queue_running: [], queue_pending: [["job"]] };
+    assert.equal(await click(), "Cannot flush while jobs run");
+    assert.equal(posts.length, 1);
+    queue = { queue_running: [], queue_pending: [] };
+    reply = { ok: false, status: 500 };
+    assert.equal(await click(), "Flush failed, click to retry");
+    reply = new TypeError("offline");
+    assert.equal(await click(), "Flush failed, click to retry");
+    assert.equal(env.requests.length, 2);
+    reply = { ok: true, status: 200 };
+    assert.equal(await click(), "Flush models from RAM and VRAM");
+    assert.equal(posts.length, 4);
+    assert.equal(env.requests.length, 3);
+
+    stats.close();
+    assert.equal(env.bar.children.length, 0);
   } finally {
     env.restore();
   }
