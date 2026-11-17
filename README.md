@@ -77,7 +77,8 @@ Restart ComfyUI afterwards. No extra packages or build step are needed.
   and is never toggled by its own group.
 
 - **Image Switch (MooBox)**: outputs `on_true` or `on_false` depending on `switch`. Only the
-  selected branch runs. Unlike the core If/Else Switch its types are fixed to IMAGE, so running
+  selected branch runs, and the other branch need not be connected; if the selected branch is not
+  connected, the run stops with a clear error naming that input. Unlike the core If/Else Switch its types are fixed to IMAGE, so running
   the workflow does not change the saved workflow.
 
 ### MooBox / Prompt

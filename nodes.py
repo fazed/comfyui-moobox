@@ -12,6 +12,8 @@ from .logic import ILLUSTRIOUS_RESOLUTIONS, filter_words, format_tags, join_prom
 
 TAGS_FILE = os.path.join(folder_paths.get_user_directory(), "moobox", "tags.csv")
 _categories = (None, {})
+# Default for optional lazy inputs: tells "not connected" apart from None ("connected, not yet evaluated").
+_MISSING = object()
 
 
 def tag_categories() -> dict[str, int]:
@@ -228,16 +230,21 @@ class MooBoxImageSwitch(io.ComfyNode):
             outputs=[io.Image.Output()],
         )
 
+    # ComfyUI passes None for a connected but not yet evaluated lazy input and leaves out an
+    # unconnected one, so _MISSING means "not connected". Requesting an unconnected input fails the prompt.
     @classmethod
-    def check_lazy_status(cls, switch, on_false=None, on_true=None):
-        if switch and on_true is None:
-            return ["on_true"]
-        if not switch and on_false is None:
-            return ["on_false"]
+    def check_lazy_status(cls, switch, on_false=_MISSING, on_true=_MISSING):
+        name, value = ("on_true", on_true) if switch else ("on_false", on_false)
+        if value is None:
+            return [name]
+        return None
 
     @classmethod
-    def execute(cls, switch, on_false=None, on_true=None):
-        return io.NodeOutput(on_true if switch else on_false)
+    def execute(cls, switch, on_false=_MISSING, on_true=_MISSING):
+        name, value = ("on_true", on_true) if switch else ("on_false", on_false)
+        if value is _MISSING:
+            raise ValueError(f"Image Switch: switch is {'on' if switch else 'off'} but {name} is not connected.")
+        return io.NodeOutput(value)
 
 
 class MooBoxIllustriousResolution(io.ComfyNode):

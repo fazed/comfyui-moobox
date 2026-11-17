@@ -104,13 +104,45 @@ class ImageSwitchTests(unittest.TestCase):
         self.assertEqual(pack.MooBoxImageSwitch.execute(False, on_false="a", on_true="b").result, ("a",))
 
     def test_requests_only_the_selected_branch(self):
+        # None means connected but not yet evaluated.
         self.assertEqual(pack.MooBoxImageSwitch.check_lazy_status(True, on_false=None, on_true=None), ["on_true"])
         self.assertEqual(pack.MooBoxImageSwitch.check_lazy_status(False, on_false=None, on_true=None), ["on_false"])
-        self.assertEqual(pack.MooBoxImageSwitch.check_lazy_status(False), ["on_false"])
+        self.assertEqual(pack.MooBoxImageSwitch.check_lazy_status(True, on_true=None), ["on_true"])
+        self.assertEqual(pack.MooBoxImageSwitch.check_lazy_status(False, on_false=None), ["on_false"])
+
+    def test_never_requests_an_unconnected_branch(self):
+        # ComfyUI leaves unconnected inputs out of the kwargs; requesting one fails the whole prompt.
+        self.assertIsNone(pack.MooBoxImageSwitch.check_lazy_status(True))
+        self.assertIsNone(pack.MooBoxImageSwitch.check_lazy_status(False))
+        self.assertIsNone(pack.MooBoxImageSwitch.check_lazy_status(True, on_false=pack._MISSING, on_true=pack._MISSING))
+        self.assertIsNone(pack.MooBoxImageSwitch.check_lazy_status(True, on_false=None))
+        self.assertIsNone(pack.MooBoxImageSwitch.check_lazy_status(False, on_true=None))
 
     def test_requests_nothing_once_selected_branch_is_available(self):
         self.assertIsNone(pack.MooBoxImageSwitch.check_lazy_status(True, on_false=None, on_true="b"))
         self.assertIsNone(pack.MooBoxImageSwitch.check_lazy_status(False, on_false="a", on_true=None))
+        self.assertIsNone(pack.MooBoxImageSwitch.check_lazy_status(True, on_true="b"))
+        self.assertIsNone(pack.MooBoxImageSwitch.check_lazy_status(False, on_false="a"))
+
+    def test_unconnected_selected_branch_raises(self):
+        with self.assertRaisesRegex(ValueError, "on_true is not connected"):
+            pack.MooBoxImageSwitch.execute(True, on_false="a")
+        with self.assertRaisesRegex(ValueError, "on_false is not connected"):
+            pack.MooBoxImageSwitch.execute(False, on_true="b")
+        with self.assertRaisesRegex(ValueError, "on_true is not connected"):
+            pack.MooBoxImageSwitch.execute(True, on_false="a", on_true=pack._MISSING)
+        with self.assertRaisesRegex(ValueError, "on_false is not connected"):
+            pack.MooBoxImageSwitch.execute(False)
+
+    def test_unselected_branch_need_not_be_connected(self):
+        self.assertEqual(pack.MooBoxImageSwitch.execute(True, on_true="b").result, ("b",))
+        self.assertEqual(pack.MooBoxImageSwitch.execute(False, on_false="a").result, ("a",))
+
+    def test_returns_selected_value_as_is(self):
+        image = object()
+        self.assertIs(pack.MooBoxImageSwitch.execute(True, on_false="a", on_true=image).result[0], image)
+        self.assertEqual(pack.MooBoxImageSwitch.execute(False, on_false=[1, 2], on_true="b").result, ([1, 2],))
+        self.assertEqual(pack.MooBoxImageSwitch.execute(False, on_false=0, on_true="b").result, (0,))
 
 
 class IllustriousResolutionTests(unittest.TestCase):
