@@ -42,10 +42,12 @@ class MooBoxPreviewImages(io.ComfyNode):
                 io.Autogrow.Input("images", template=io.Autogrow.TemplatePrefix(
                     io.Image.Input("image"), prefix="image", min=1, max=100,
                 )),
+                io.Boolean.Input("add_to_assets", display_name="add to assets", default=False, tooltip="Also list the previews in the assets panel."),
             ],
             outputs=[],
         )
 
     @classmethod
-    def execute(cls, images: io.Autogrow.Type) -> io.NodeOutput:
-        return io.NodeOutput(ui={"previews": [file for name in connected(images) for file in ui.PreviewImage(images[name], cls=cls).values]})
+    def execute(cls, images: io.Autogrow.Type, add_to_assets: bool = False) -> io.NodeOutput:
+        files = [file for name in connected(images) for file in ui.PreviewImage(images[name], cls=cls).values]
+        return io.NodeOutput(ui={"previews": files, "images": files} if add_to_assets else {"previews": files})

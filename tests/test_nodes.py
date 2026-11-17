@@ -179,6 +179,9 @@ class PreviewImagesTests(unittest.TestCase):
         template = schema.inputs[0].template
         self.assertIsInstance(template.input, self.io.Image.Input)
         self.assertEqual((template.prefix, template.min, template.max), ("image", 1, 100))
+        switch = schema.inputs[1]
+        self.assertIsInstance(switch, self.io.Boolean.Input)
+        self.assertEqual((len(schema.inputs), switch.id, switch.display_name, switch.default), (2, "add_to_assets", "add to assets", False))
 
     def test_all_images_of_all_inputs_are_saved_in_input_order(self):
         first, second = torch.rand(2, 8, 8, 3), torch.rand(3, 16, 12, 3)
@@ -191,3 +194,10 @@ class PreviewImagesTests(unittest.TestCase):
                 with Image.open(Path(temp, file["subfolder"], file["filename"])) as image:
                     sizes.append(image.size)
         self.assertEqual(sizes, [(8, 8)] * 2 + [(12, 16)] * 3)
+
+    def test_add_to_assets_also_returns_the_previews_as_images(self):
+        with tempfile.TemporaryDirectory() as temp, patch.object(self.paths, "temp_directory", temp):
+            output = self.compare.MooBoxPreviewImages.execute({"image0": torch.rand(2, 8, 8, 3)}, add_to_assets=True).ui
+        self.assertEqual(sorted(output), ["images", "previews"])
+        self.assertEqual(len(output["previews"]), 2)
+        self.assertEqual(output["images"], output["previews"])

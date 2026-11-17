@@ -86,6 +86,8 @@ Restart ComfyUI afterwards. No extra packages or build step are needed.
   The arrow buttons step through them and wrap around at the ends; the counter shows the position.
   A new run starts at the first image again. Like Image Compare, the previews are not stored in the
   workflow and only show again after the next run.
+  Switch on **add to assets** to also add the images to the assets panel; in the classic view
+  they then also show as ComfyUI's own preview.
 
 ### MooBox / Prompt
 
