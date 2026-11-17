@@ -8,7 +8,7 @@ import folder_paths
 import nodes
 from comfy_api.latest import io
 
-from .logic import filter_words, format_tags, join_prompt, order_illustrious, read_categories, read_state
+from .logic import ILLUSTRIOUS_RESOLUTIONS, filter_words, format_tags, join_prompt, order_illustrious, read_categories, read_state
 
 TAGS_FILE = os.path.join(folder_paths.get_user_directory(), "moobox", "tags.csv")
 _categories = (None, {})
@@ -236,3 +236,19 @@ class MooBoxImageSwitch(io.ComfyNode):
     @classmethod
     def execute(cls, switch, on_false=None, on_true=None):
         return io.NodeOutput(on_true if switch else on_false)
+
+
+class MooBoxIllustriousResolution(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="MooBoxIllustriousResolution",
+            display_name="Illustrious Resolution (MooBox)",
+            category="MooBox/Utility",
+            inputs=[io.Combo.Input("resolution", options=list(ILLUSTRIOUS_RESOLUTIONS), default="Portrait 832 x 1216 (13:19)")],
+            outputs=[io.Int.Output("width"), io.Int.Output("height")],
+        )
+
+    @classmethod
+    def execute(cls, resolution):
+        return io.NodeOutput(*ILLUSTRIOUS_RESOLUTIONS[resolution])

@@ -111,3 +111,14 @@ class ImageSwitchTests(unittest.TestCase):
     def test_requests_nothing_once_selected_branch_is_available(self):
         self.assertIsNone(pack.MooBoxImageSwitch.check_lazy_status(True, on_false=None, on_true="b"))
         self.assertIsNone(pack.MooBoxImageSwitch.check_lazy_status(False, on_false="a", on_true=None))
+
+
+class IllustriousResolutionTests(unittest.TestCase):
+    def test_outputs_width_and_height(self):
+        self.assertEqual(pack.MooBoxIllustriousResolution.execute("Portrait 832 x 1216 (13:19)").result, (832, 1216))
+        self.assertEqual(pack.MooBoxIllustriousResolution.execute("Landscape 1344 x 768 (7:4)").result, (1344, 768))
+        self.assertEqual(pack.MooBoxIllustriousResolution.execute("Square 1024 x 1024 (1:1)").result, (1024, 1024))
+
+    def test_unknown_label_raises(self):
+        with self.assertRaises(KeyError):
+            pack.MooBoxIllustriousResolution.execute("Square 512 x 512")

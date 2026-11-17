@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 
 
@@ -126,3 +127,15 @@ def order_illustrious(text: str, categories: dict[str, int], quality_first: bool
         return CATEGORY_BUCKET.get(categories[key], 5) if key in categories else 7
 
     return ", ".join(sorted(split_words(format_tags(text)), key=bucket))
+
+
+def resolution_label(width: int, height: int) -> str:
+    shape = "Square" if width == height else "Portrait" if width < height else "Landscape"
+    divisor = math.gcd(width, height)
+    return f"{shape} {width} x {height} ({width // divisor}:{height // divisor})"
+
+
+ILLUSTRIOUS_RESOLUTIONS = {
+    resolution_label(width, height): (width, height)
+    for width, height in ((1024, 1024), (832, 1216), (896, 1152), (768, 1344), (1216, 832), (1152, 896), (1344, 768))
+}
