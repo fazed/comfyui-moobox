@@ -131,11 +131,7 @@
 .kt-preview { display: none; position: fixed; z-index: 10000; max-width: 220px; max-height: 280px; object-fit: contain; border: 1px solid var(--kt-line, #465368); border-radius: 8px; background: #11151a; box-shadow: 0 12px 28px #000a; pointer-events: none; }
 .kt-group { padding: 6px 8px; margin-bottom: 4px; }
 .kt-group .kt-card-heading { gap: 6px; }
-.kt-words { display: flex; flex-direction: column; gap: 3px; padding: 6px 0 2px 34px; }
-.kt-word { display: flex; align-items: center; gap: 8px; }
-.kt-word[data-active="false"] .kt-word-text { color: var(--kt-muted); }
-.kt-word-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.kt-word .kt-number { flex: 0 0 62px; width: 62px; height: 26px; }
+.kt-group > .kt-pills { padding-top: 6px; }
 .kt-loader { padding: 0; gap: 8px; background: transparent; border: none; border-radius: 0; }
 .kt-panel { display: flex; flex-direction: column; gap: 8px; min-height: 0; padding: 10px; background: var(--kt-bg); border: 1px solid var(--kt-line); border-radius: 10px; }
 .kt-search-panel { flex-shrink: 0; position: relative; z-index: 2; }
@@ -166,11 +162,12 @@
 .kt-pills { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0; }
 .kt-pill { display: inline-flex; align-items: center; max-width: 100%; border: 1px solid var(--kt-line); border-radius: 16px; background: var(--kt-card); overflow: hidden; }
 .kt-pill[data-active="true"] { background: #5f9fde22; border-color: #79afe24d; }
-.kt-pill[data-active="false"] { border-style: dashed; }
 .kt-root .kt-pill .kt-pill-label { border: none; border-radius: 0; min-height: 26px; padding: 2px 4px 2px 11px; text-align: left; overflow-wrap: anywhere; }
 .kt-pill[data-active="true"] .kt-pill-label { color: #c9e3ff; }
 .kt-pill[data-active="false"] .kt-pill-label { color: var(--kt-muted); }
 .kt-root .kt-pill .kt-number { flex: 0 0 40px; width: 40px; height: 26px; padding: 0 6px 0 2px; border: none; border-radius: 0; background: transparent; color: var(--kt-muted); font-size: 11px; text-align: center; }
+.kt-absent { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding: 6px 8px 8px; border: 1px dashed var(--kt-muted); border-radius: 8px; }
+.kt-absent > :is(.kt-pills, .kt-group) { opacity: .7; }
 
 .kt-tag-popup {
   position: fixed;

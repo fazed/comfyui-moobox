@@ -48,6 +48,22 @@ test('duplicate groups keep independent selections and identity order', () => {
   assert.deepEqual(state.groups.map((group) => group.active), [true, false]);
 });
 
+test('groups match despite trailing commas and drop saved duplicates', () => {
+  const state = { groups: [
+    { text: 'alpha,', active: false, strength: 0.7, items: [{ text: 'alpha', active: true }] },
+    { text: 'beta, gamma', active: false, strength: 1, items: [] },
+    { text: 'alpha', active: true, strength: 1, items: [] },
+    { text: 'delta', active: true, strength: 1, items: [] },
+  ] };
+  const result = reconcileWords(state, 'alpha,,, beta, gamma,', true);
+  assert.deepEqual(result.groups.map((group) => [group.text, group.present, group.active]), [
+    ['alpha', true, false],
+    ['beta, gamma,', true, false],
+    ['delta', false, true],
+  ]);
+  assert.equal(result.groups[0].strength, 0.7);
+});
+
 test('only active entries and active node modes produce live trigger previews', () => {
   const entries = [{ active: true, words: ['alpha'] }, { active: false, words: ['beta'] }];
   assert.equal(activeWords(entries), 'alpha');

@@ -21,24 +21,29 @@ export function addLora(entries, entry) {
   return entries.some((saved) => saved.name === entry.name) ? entries : [...entries, entry];
 }
 
+const groupKey = (text) => text.replace(/^[\s,]+|[\s,]+$/g, "");
+
 export function reconcileWords(state, source, defaultActive = false) {
   const groups = structuredClone(state.groups || []).map((group) => ({ ...group, present: false }));
   const queues = new Map();
   groups.forEach((group) => {
-    if (!queues.has(group.text)) queues.set(group.text, []);
-    queues.get(group.text).push(group);
+    const key = groupKey(group.text);
+    if (!queues.has(key)) queues.set(key, []);
+    queues.get(key).push(group);
   });
   const visible = [];
   for (const text of splitWords(source, true)) {
-    let group = queues.get(text)?.shift();
+    let group = queues.get(groupKey(text))?.shift();
     if (!group) {
       group = { text, active: defaultActive, strength: 1, items: splitWords(text).map((word) => ({ text: word, active: true })) };
       groups.push(group);
     }
+    group.text = text;
     group.present = true;
     visible.push(group);
   }
-  return { ...state, source, groups: [...visible, ...groups.filter((group) => !group.present)] };
+  const keys = new Set(visible.map((group) => groupKey(group.text)));
+  return { ...state, source, groups: [...visible, ...groups.filter((group) => !group.present && !keys.has(groupKey(group.text)))] };
 }
 
 export function activeWords(entries, mode = 0) {

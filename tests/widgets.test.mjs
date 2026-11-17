@@ -260,22 +260,20 @@ test('LoRA Manager search without a family stays a single page of 50', async () 
   const { widget } = extension.getCustomWidgets().MOOBOX_TRIGGERS(node, 'selection');
   const value = state.reconcileWords({ groups: [] }, 'alpha, beta');
   value.groups[0].items[1].active = false;
+  value.groups[0].active = true;
   widget.value = JSON.stringify(value);
-  assert.equal(find(widget.element, (el) => el.className === 'kt-words'), undefined);
-  labelled(widget.element, 'Expand group alpha, beta').click();
-  const words = find(widget.element, (el) => el.className === 'kt-words');
-  assert.equal(find(words.children[1], (el) => el.type === 'checkbox').checked, false);
-  const first = find(words.children[0], (el) => el.type === 'checkbox');
-  first.checked = false;
-  first.dispatchEvent(new Event('change'));
+  const group = find(widget.element, (el) => el.className === 'kt-card kt-group');
+  const words = find(group, (el) => el.className === 'kt-pills');
+  assert.deepEqual(words.children.map((pill) => pill.dataset.active), ['true', 'false']);
+  labelled(group, 'Toggle word alpha').click();
   assert.deepEqual(JSON.parse(widget.value).groups[0].items.map((item) => item.active), [false, false]);
 });
+  assert.equal(JSON.parse(widget.value).groups[0].active, true);
 
 test('trigger words take a per-word weight that defaults to 1', async () => {
   const { node, extension } = await harness();
   const { widget } = extension.getCustomWidgets().MOOBOX_TRIGGERS(node, 'selection');
   widget.value = JSON.stringify(state.reconcileWords({ groups: [] }, 'alpha, beta'));
-  labelled(widget.element, 'Expand group alpha, beta').click();
   const weight = labelled(widget.element, 'Word weight beta');
   assert.equal(weight.value, 1);
   weight.value = '0.7';
@@ -337,11 +335,66 @@ test('absent groups can be forgotten on request', async () => {
   const { widget } = extension.getCustomWidgets().MOOBOX_TRIGGERS(node, 'selection');
   widget.value = JSON.stringify(state.reconcileWords(state.reconcileWords({ groups: [] }, 'alpha,, beta'), 'alpha'));
   labelled(widget.element, 'Remove saved selections of groups the source no longer contains').click();
+  assert.ok(find(widget.element, (el) => el.textContent === 'Not in source (1)'));
+  const list = find(widget.element, (el) => el.className === 'kt-list');
+  assert.deepEqual(list.children.map((box) => box.className), ['kt-card kt-group', 'kt-absent']);
+  const parked = list.children[1];
+  assert.equal(labelled(parked, 'Enable group alpha'), undefined);
+  assert.ok(labelled(parked, 'Toggle word beta'));
+  const enable = labelled(parked, 'Enable group beta');
+  enable.checked = !enable.checked;
+  enable.dispatchEvent(new Event('change'));
+  const beta = JSON.parse(widget.value).groups[1];
+  assert.deepEqual([beta.text, beta.active, beta.present], ['beta', enable.checked, false]);
   assert.deepEqual(JSON.parse(widget.value).groups.map((group) => group.text), ['alpha']);
   assert.equal(labelled(widget.element, 'Remove saved selections of groups the source no longer contains'), undefined);
 });
 
 test('loader re-renders only rewrite connected trigger nodes when the words change', async () => {
+test('pill view keeps absent pills editable in their own section and can forget them', async () => {
+  const { node, extension } = await harness();
+  const { widget } = extension.getCustomWidgets().MOOBOX_TRIGGERS(node, 'selection');
+  const value = state.reconcileWords(state.reconcileWords({ groups: [] }, 'alpha,, beta, gamma'), 'alpha');
+  widget.value = JSON.stringify({ ...value, view: 'pills' });
+  const parked = find(widget.element, (el) => el.className === 'kt-absent');
+  labelled(parked, 'Toggle word gamma').click();
+  const beta = JSON.parse(widget.value).groups[1];
+  assert.deepEqual([beta.active, beta.present, beta.items.map((item) => item.active)], [true, false, [false, true]]);
+  labelled(widget.element, 'Remove saved selections of groups the source no longer contains').click();
+  assert.deepEqual(JSON.parse(widget.value).groups.map((group) => group.text), ['alpha']);
+  assert.equal(find(widget.element, (el) => el.className === 'kt-absent'), undefined);
+});
+
+test('absent groups sit in a separate section after the present ones in both views', async () => {
+  const { node, extension } = await harness();
+  const { widget } = extension.getCustomWidgets().MOOBOX_TRIGGERS(node, 'selection');
+  const value = state.reconcileWords(state.reconcileWords({ groups: [] }, 'alpha,, beta, gamma,, delta'), 'alpha,, delta');
+  const absentSection = () => find(widget.element, (el) => el.className === 'kt-absent');
+
+  widget.value = JSON.stringify({ ...value, view: 'pills' });
+  const list = find(widget.element, (el) => el.className === 'kt-list');
+  assert.deepEqual(list.children.map((el) => el.className), ['kt-pills', 'kt-absent']);
+  const words = (el) => el.children.map((pill) => pill.children[0].textContent);
+  assert.deepEqual(words(list.children[0]), ['alpha', 'delta']);
+  assert.ok(find(absentSection(), (el) => el.textContent === 'Not in source (1)'));
+  assert.ok(labelled(absentSection(), 'Remove saved selections of groups the source no longer contains'));
+  assert.deepEqual(words(find(absentSection(), (el) => el.className === 'kt-pills')), ['beta', 'gamma']);
+  assert.equal(find(widget.element, (el) => el.className === 'kt-badge').textContent, '0/2 active');
+
+  widget.value = JSON.stringify({ ...value, view: 'groups' });
+  const cards = find(widget.element, (el) => el.className === 'kt-list').children;
+  assert.deepEqual(cards.map((el) => el.className), ['kt-card kt-group', 'kt-card kt-group', 'kt-absent']);
+  const name = (el) => find(el, (child) => child.className === 'kt-name').textContent;
+  assert.deepEqual(cards.slice(0, 2).map(name), ['alpha', 'delta']);
+  assert.equal(name(cards[2]), 'beta, gamma');
+  assert.ok(find(cards[2], (el) => el.textContent === 'Not in source (1)'));
+
+  widget.value = JSON.stringify({ ...state.reconcileWords({ groups: [] }, 'alpha'), view: 'pills' });
+  assert.equal(absentSection(), undefined);
+  widget.value = JSON.stringify({ ...state.reconcileWords({ groups: [] }, 'alpha'), view: 'groups' });
+  assert.equal(absentSection(), undefined);
+});
+
   const { node, extension } = await harness();
   let writes = 0;
   const target = { comfyClass: 'MooBoxTriggerWords', widgets: [{ name: 'selection', get value() { return '{"source":"","groups":[]}'; }, set value(_) { writes++; } }] };
@@ -363,7 +416,7 @@ test('pill view toggles single words and keeps other words in a disabled group o
   const { node, extension } = await harness();
   const { widget } = extension.getCustomWidgets().MOOBOX_TRIGGERS(node, 'selection');
   widget.value = JSON.stringify({ ...state.reconcileWords({ groups: [] }, 'alpha, beta'), view: 'pills' });
-  assert.equal(find(widget.element, (el) => el.className === 'kt-words'), undefined);
+  assert.equal(find(widget.element, (el) => el.className?.startsWith('kt-card')), undefined);
   labelled(widget.element, 'Toggle word beta').click();
   const saved = JSON.parse(widget.value);
   assert.equal(saved.view, 'pills');

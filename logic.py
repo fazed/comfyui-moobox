@@ -45,14 +45,18 @@ def read_state(value: str | dict | list) -> dict | list:
     return json.loads(value) if isinstance(value, str) else value
 
 
+def group_key(text: str) -> str:
+    return text.strip(", \t\r\n")
+
+
 def filter_words(source: str, selection: str | dict, default_active: bool) -> str:
     state = read_state(selection)
     saved = {}
     for group in state.get("groups", []):
-        saved.setdefault(group["text"], []).append(group)
+        saved.setdefault(group_key(group["text"]), []).append(group)
     output = []
     for text in split_words(source, groups=True):
-        queue = saved.get(text, [])
+        queue = saved.get(group_key(text), [])
         group = queue.pop(0) if queue else {"active": default_active, "items": [], "strength": 1}
         if not group.get("active", True):
             continue

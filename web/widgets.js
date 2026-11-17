@@ -420,7 +420,6 @@ function loaderWidget(node, name) {
   widget.refreshSearch = () => { clearTimeout(timer); runSearch(); };
 function triggerWidget(node, name) {
   const root = element("div", "kt-root kt-triggers");
-  const open = new Set();
   let widget;
   let previousList;
   const render = (state) => {
@@ -443,79 +442,68 @@ function triggerWidget(node, name) {
       views.append(choice);
     }
     heading.append(element("span", "kt-title", "Trigger words"), element("span", "kt-badge", `${count}/${total} active`), views);
-    const absent = state.groups.length - visible.length;
-    if (absent) heading.append(button(`Forget ${absent} absent`, "Remove saved selections of groups the source no longer contains", () => {
-      const value = JSON.parse(widget.value);
-      change(node, widget, { ...value, groups: value.groups.filter((group) => group.present !== false) });
-    }));
     root.append(heading);
     const list = element("div", "kt-list");
     if (!visible.length) {
       const empty = element("div", "kt-empty");
+    const absent = state.groups.length - visible.length;
       empty.append(element("strong", "", "Ready for trigger words"), element("span", "", "Connect your loader’s trigger_words output, or enter words below."));
       list.append(empty);
     }
-    if (pills) {
-      const cloud = element("div", "kt-pills");
-      for (const [index, group] of state.groups.entries()) {
-        if (group.present === false) continue;
-        group.items.forEach((item, itemIndex) => {
-          const on = group.active && item.active;
-          const pill = element("span", "kt-pill");
-          pill.dataset.active = String(on);
-          // Enabling a word in a disabled group switches the group on and keeps its other words off.
-          const label = button(item.text, `Toggle word ${item.text}`, () => mutate(index, (value) => {
-            if (on) { value.items[itemIndex].active = false; return; }
-            if (!value.active) value.items.forEach((other) => { other.active = false; });
-            value.active = true;
-            value.items[itemIndex].active = true;
-          }));
-          label.setAttribute("aria-pressed", String(on));
-          label.classList.add("kt-pill-label");
-          pill.append(label, number(item.strength ?? 1, `Word weight ${item.text}`, (strength) => mutate(index, (value) => { value.items[itemIndex].strength = strength; })));
-          cloud.append(pill);
-        });
-      }
-      list.append(cloud);
+    const wordPills = (index, group) => group.items.map((item, itemIndex) => {
+      const on = group.active && item.active;
+      const pill = element("span", "kt-pill");
+      pill.dataset.active = String(on);
+      // Enabling a word in a disabled group switches the group on and keeps its other words off.
+      const label = button(item.text, `Toggle word ${item.text}`, () => mutate(index, (value) => {
+        if (on) { value.items[itemIndex].active = false; return; }
+        if (!value.active) value.items.forEach((other) => { other.active = false; });
+        value.active = true;
+        value.items[itemIndex].active = true;
+      }));
+      label.setAttribute("aria-pressed", String(on));
+      label.classList.add("kt-pill-label");
+      pill.append(label, number(item.strength ?? 1, `Word weight ${item.text}`, (strength) => mutate(index, (value) => { value.items[itemIndex].strength = strength; })));
+      return pill;
+    });
+    // Groups the source no longer produces stay editable in a dashed section until the user forgets them.
+    const parked = element("div", "kt-absent");
+    if (absent) {
+      const title = element("div", "kt-section-heading");
+      title.append(element("span", "kt-section-title", `Not in source (${absent})`), button("Forget all", "Remove saved selections of groups the source no longer contains", () => {
+        const value = JSON.parse(widget.value);
+        change(node, widget, { ...value, groups: value.groups.filter((group) => group.present !== false) });
+      }));
+      parked.append(title);
     }
-    for (const [index, group] of pills ? [] : state.groups.entries()) {
-      if (group.present === false) continue;
-      const expanded = open.has(group.text);
-      const box = element("div", "kt-card kt-group");
-      box.dataset.active = String(group.active);
-      const update = (action) => mutate(index, action);
-      const row = element("div", "kt-card-heading");
-      const chevron = button(expanded ? "▾" : "▸", `${expanded ? "Collapse" : "Expand"} group ${group.text}`, () => {
-        if (open.has(group.text)) open.delete(group.text); else open.add(group.text);
-        render(JSON.parse(widget.value));
-      });
-      chevron.classList.add("kt-icon");
-      chevron.setAttribute("aria-expanded", String(expanded));
-      const identity = element("div", "kt-identity");
-      const label = element("span", "kt-name", group.text);
-      label.title = group.text;
-      identity.append(label, element("span", "kt-muted", `${group.items.filter((item) => item.active).length}/${group.items.length} words selected`));
-      row.append(chevron, toggle(group.active, `Enable group ${group.text}`, (active) => update((item) => { item.active = active; })), identity,
-        field("Weight", number(group.strength, `Group strength ${group.text}`, (strength) => update((item) => { item.strength = strength; }))));
-      box.append(row);
-      if (expanded) {
-        const words = element("div", "kt-words");
-        group.items.forEach((item, itemIndex) => {
-          const wordRow = element("div", "kt-word");
-          wordRow.dataset.active = String(item.active);
-          wordRow.append(toggle(item.active, `Enable word ${item.text}`, (active) => update((value) => { value.items[itemIndex].active = active; })),
-            element("span", "kt-word-text", item.text),
-            number(item.strength ?? 1, `Word weight ${item.text}`, (strength) => update((value) => { value.items[itemIndex].strength = strength; })));
-          wordRow.children[1].title = item.text;
-          words.append(wordRow);
-        });
-        box.append(words);
+    for (const [target, present] of [[list, true], [parked, false]]) {
+      const groups = [...state.groups.entries()].filter(([, group]) => (group.present !== false) === present);
+      if (pills && groups.length) {
+        const cloud = element("div", "kt-pills");
+        for (const [index, group] of groups) cloud.append(...wordPills(index, group));
+        target.append(cloud);
       }
-      list.append(box);
+      for (const [index, group] of pills ? [] : groups) {
+        const box = element("div", "kt-card kt-group");
+        box.dataset.active = String(group.active);
+        const update = (action) => mutate(index, action);
+        const row = element("div", "kt-card-heading");
+        const identity = element("div", "kt-identity");
+        const label = element("span", "kt-name", group.text);
+        label.title = group.text;
+        identity.append(label);
+        row.append(toggle(group.active, `Enable group ${group.text}`, (active) => update((item) => { item.active = active; })), identity,
+          field("Weight", number(group.strength, `Group strength ${group.text}`, (strength) => update((item) => { item.strength = strength; }))));
+        const words = element("div", "kt-pills");
+        words.append(...wordPills(index, group));
+        box.append(row, words);
+        target.append(box);
+      }
     }
     root.append(list);
     list.scrollTop = scroll;
     previousList = list;
+    if (absent) list.append(parked);
     const editor = element("details", "kt-source-editor");
     const connected = node.inputs?.some((input) => input.name === "trigger_words" && input.link != null) || false;
     editor.open = !connected && !state.source;
@@ -550,12 +538,6 @@ app.registerExtension({
   beforeRegisterNodeDef(type, data) {
     if (data.name !== LOADER && data.name !== TRIGGERS) return;
     const previous = type.prototype.onExecuted;
-        const family = this.widgets?.find((item) => item.name === "family");
-        const loras = this.widgets?.find((item) => item.name === "loras");
-        if (family && loras) {
-          const changed = family.callback;
-          family.callback = (...args) => { changed?.(...args); loras.refreshSearch(); };
-        }
     type.prototype.onExecuted = function (message) {
       previous?.apply(this, arguments);
       if (data.name === LOADER && message.trigger_words) syncConnected(this, message.trigger_words[0]);
@@ -568,6 +550,12 @@ app.registerExtension({
         // Saved workflows restore their own choice when the node is configured afterwards.
         const loader = this.widgets?.find((item) => item.name === "loader");
         if (!loader) return;
+        const family = this.widgets?.find((item) => item.name === "family");
+        const loras = this.widgets?.find((item) => item.name === "loras");
+        if (family && loras) {
+          const changed = family.callback;
+          family.callback = (...args) => { changed?.(...args); loras.refreshSearch(); };
+        }
         if (LiteGraph.registered_node_types[MANAGER_NODE]) loader.value = "LoRA Manager";
         else loader.options.values = ["ComfyUI"];
       };

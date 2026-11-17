@@ -36,6 +36,13 @@ class TriggerTests(unittest.TestCase):
         state = {"groups": [{"text": "alpha, beta", "active": True, "items": [{"text": "alpha", "active": True, "strength": 0.6}]}]}
         self.assertEqual(filter_words("alpha, beta", state, True), "(alpha:0.6), beta")
 
+    def test_trailing_comma_matches_saved_group(self):
+        state = {"groups": [
+            {"text": "alpha,", "active": True, "strength": 0.8},
+            {"text": "beta, gamma", "active": True, "items": [{"text": "beta", "active": False}]},
+        ]}
+        self.assertEqual(filter_words("alpha,,, beta, gamma,", state, False), "(alpha:0.8), gamma")
+
 
 class TagFormatTests(unittest.TestCase):
     def test_normalizes_separators_spacing_and_duplicates(self):
