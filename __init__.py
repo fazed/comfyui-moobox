@@ -3,8 +3,10 @@ from comfy_api.latest import ComfyExtension
 from .compare import MooBoxImageCompare, MooBoxPreviewImages
 from .nodes import MooBoxGroupsToggle, MooBoxIllustriousResolution, MooBoxIllustriousTags, MooBoxImageSwitch, MooBoxLoraLoader, MooBoxSeeds, MooBoxTagPrompt, MooBoxTagTextPrompt, MooBoxTriggerWords
 from . import routes
+from .schedulers import inject_schedulers
 
 WEB_DIRECTORY = "./web"
+inject_schedulers()
 
 
 class MooBox(ComfyExtension):
