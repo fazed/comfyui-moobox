@@ -96,3 +96,18 @@ class GroupsToggleTests(unittest.TestCase):
     def test_runs_without_output(self):
         output = pack.MooBoxGroupsToggle.execute("bypass", "", "", "position", True, "(all)")
         self.assertEqual(output.result, ())
+
+
+class ImageSwitchTests(unittest.TestCase):
+    def test_returns_selected_input(self):
+        self.assertEqual(pack.MooBoxImageSwitch.execute(True, on_false="a", on_true="b").result, ("b",))
+        self.assertEqual(pack.MooBoxImageSwitch.execute(False, on_false="a", on_true="b").result, ("a",))
+
+    def test_requests_only_the_selected_branch(self):
+        self.assertEqual(pack.MooBoxImageSwitch.check_lazy_status(True, on_false=None, on_true=None), ["on_true"])
+        self.assertEqual(pack.MooBoxImageSwitch.check_lazy_status(False, on_false=None, on_true=None), ["on_false"])
+        self.assertEqual(pack.MooBoxImageSwitch.check_lazy_status(False), ["on_false"])
+
+    def test_requests_nothing_once_selected_branch_is_available(self):
+        self.assertIsNone(pack.MooBoxImageSwitch.check_lazy_status(True, on_false=None, on_true="b"))
+        self.assertIsNone(pack.MooBoxImageSwitch.check_lazy_status(False, on_false="a", on_true=None))

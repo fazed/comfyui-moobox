@@ -207,3 +207,32 @@ class MooBoxGroupsToggle(io.ComfyNode):
     @classmethod
     def execute(cls, action, match_title, match_colors, sort, root_graph, match_subgraph):
         return io.NodeOutput()
+
+
+# Fixed IMAGE types: core's ComfySwitchNode resolves its "*" types on queue, which changes the saved workflow after every run.
+class MooBoxImageSwitch(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="MooBoxImageSwitch",
+            display_name="Image Switch (MooBox)",
+            category="MooBox/Utility",
+            description="Passes on_true or on_false through. Only the selected branch runs.",
+            inputs=[
+                io.Boolean.Input("switch", default=False),
+                io.Image.Input("on_false", lazy=True, optional=True),
+                io.Image.Input("on_true", lazy=True, optional=True),
+            ],
+            outputs=[io.Image.Output()],
+        )
+
+    @classmethod
+    def check_lazy_status(cls, switch, on_false=None, on_true=None):
+        if switch and on_true is None:
+            return ["on_true"]
+        if not switch and on_false is None:
+            return ["on_false"]
+
+    @classmethod
+    def execute(cls, switch, on_false=None, on_true=None):
+        return io.NodeOutput(on_true if switch else on_false)

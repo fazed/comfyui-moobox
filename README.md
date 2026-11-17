@@ -76,6 +76,10 @@ Restart ComfyUI afterwards. No extra packages or build step are needed.
   A group counts as on while at least one of its nodes is active. The node itself never runs
   and is never toggled by its own group.
 
+- **Image Switch (MooBox)**: outputs `on_true` or `on_false` depending on `switch`. Only the
+  selected branch runs. Unlike the core If/Else Switch its types are fixed to IMAGE, so running
+  the workflow does not change the saved workflow.
+
 ### MooBox / Prompt
 
 Type in a text field of a node (Nodes 2.0 and classic) and suggestions from your
