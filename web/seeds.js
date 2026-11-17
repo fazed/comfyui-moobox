@@ -61,6 +61,7 @@ function button(text, title, action) {
 }
 
 function syncOutputs(node, count) {
+  if (node.outputs.length === count) return;
   while (node.outputs.length > count) node.removeOutput(node.outputs.length - 1);
   while (node.outputs.length < count) node.addOutput(`seed_${node.outputs.length + 1}`, "INT");
   node.setSize([node.size[0], node.computeSize()[1]]);
