@@ -49,7 +49,7 @@ interpreter that has `aiohttp`, such as ComfyUI's own `.venv`.
 These come from bugs we already had. Check them before you start and again before you call a node done.
 
 **Refreshing and cleanup**
-- Do not poll with `setInterval` and do not listen to every click or key on the document to refresh a node. ComfyUI sends no event when a group, a node position or a node mode changes. Refresh on creation, on workflow load (`afterConfigureGraph`, `onConfigure`, `onAdded`), when a widget changes (`widget.callback`), after the node's own actions and on an explicit Refresh button.
+- Do not poll with `setInterval` unless the interval is needed for upkeep that events cannot cover (such as the system stats meter, which samples CPU and memory and pauses while the document is hidden); justify such a timer in the code and test its cleanup. Do not listen to every click or key on the document to refresh a node. ComfyUI sends no event when a group, a node position or a node mode changes. Refresh on creation, on workflow load (`afterConfigureGraph`, `onConfigure`, `onAdded`), when a widget changes (`widget.callback`), after the node's own actions and on an explicit Refresh button.
 - Everything a node starts has an owner that stops it: listeners on `document`, `window` or `api`, timers, observers, popups and menus appended to `document.body`. Clean up in `node.onRemoved` or `widget.onRemove`, and test it: add the node, remove it and check nothing is left. Also check what happens when a popup or menu is open while the node is removed.
 - Debounce with a single timer that you clear on input and on removal. A debounce is not polling, but it still needs that cleanup.
 - Move repeating animations to CSS (`@keyframes`) so the browser pauses them when the tab is hidden.
