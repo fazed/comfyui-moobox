@@ -45,6 +45,7 @@ async function harness(fetchApi) {
   const mocks = {
     '../../scripts/app.js': { app: { registerExtension: (value) => { extension = value; } } },
     '../../scripts/api.js': { api: { fetchApi, apiURL: (path) => path } },
+    './icons.js': { glyph: () => new Element() },
     './state.js': state,
     './styles.js': {},
   };
@@ -126,7 +127,6 @@ test('late search responses cannot replace results for a newer query', async () 
   widget.onRemove();
 });
 
-test('trigger factory restores groups before interaction and preserves child switches', async () => {
 test('native search sends the chosen family and a family change refreshes the results', async () => {
   const paths = [];
   const { node, extension } = await harness(async (path) => {
@@ -256,19 +256,20 @@ test('LoRA Manager search without a family stays a single page of 50', async () 
   widget.onRemove();
 });
 
+test('trigger factory restores groups before interaction and preserves child switches', async () => {
   const { node, extension } = await harness();
   const { widget } = extension.getCustomWidgets().MOOBOX_TRIGGERS(node, 'selection');
   const value = state.reconcileWords({ groups: [] }, 'alpha, beta');
-  value.groups[0].items[1].active = false;
   value.groups[0].active = true;
+  value.groups[0].items[1].active = false;
   widget.value = JSON.stringify(value);
   const group = find(widget.element, (el) => el.className === 'kt-card kt-group');
   const words = find(group, (el) => el.className === 'kt-pills');
   assert.deepEqual(words.children.map((pill) => pill.dataset.active), ['true', 'false']);
   labelled(group, 'Toggle word alpha').click();
   assert.deepEqual(JSON.parse(widget.value).groups[0].items.map((item) => item.active), [false, false]);
-});
   assert.equal(JSON.parse(widget.value).groups[0].active, true);
+});
 
 test('trigger words take a per-word weight that defaults to 1', async () => {
   const { node, extension } = await harness();
@@ -334,7 +335,6 @@ test('absent groups can be forgotten on request', async () => {
   const { node, extension } = await harness();
   const { widget } = extension.getCustomWidgets().MOOBOX_TRIGGERS(node, 'selection');
   widget.value = JSON.stringify(state.reconcileWords(state.reconcileWords({ groups: [] }, 'alpha,, beta'), 'alpha'));
-  labelled(widget.element, 'Remove saved selections of groups the source no longer contains').click();
   assert.ok(find(widget.element, (el) => el.textContent === 'Not in source (1)'));
   const list = find(widget.element, (el) => el.className === 'kt-list');
   assert.deepEqual(list.children.map((box) => box.className), ['kt-card kt-group', 'kt-absent']);
@@ -346,11 +346,11 @@ test('absent groups can be forgotten on request', async () => {
   enable.dispatchEvent(new Event('change'));
   const beta = JSON.parse(widget.value).groups[1];
   assert.deepEqual([beta.text, beta.active, beta.present], ['beta', enable.checked, false]);
+  labelled(widget.element, 'Remove saved selections of groups the source no longer contains').click();
   assert.deepEqual(JSON.parse(widget.value).groups.map((group) => group.text), ['alpha']);
   assert.equal(labelled(widget.element, 'Remove saved selections of groups the source no longer contains'), undefined);
 });
 
-test('loader re-renders only rewrite connected trigger nodes when the words change', async () => {
 test('pill view keeps absent pills editable in their own section and can forget them', async () => {
   const { node, extension } = await harness();
   const { widget } = extension.getCustomWidgets().MOOBOX_TRIGGERS(node, 'selection');
@@ -395,6 +395,7 @@ test('absent groups sit in a separate section after the present ones in both vie
   assert.equal(absentSection(), undefined);
 });
 
+test('loader re-renders only rewrite connected trigger nodes when the words change', async () => {
   const { node, extension } = await harness();
   let writes = 0;
   const target = { comfyClass: 'MooBoxTriggerWords', widgets: [{ name: 'selection', get value() { return '{"source":"","groups":[]}'; }, set value(_) { writes++; } }] };

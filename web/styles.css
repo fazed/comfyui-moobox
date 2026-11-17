@@ -49,7 +49,7 @@
 .kt-root :is(button, a, input, textarea, summary):focus-visible { outline: 2px solid var(--kt-accent); outline-offset: 2px; }
 .kt-root .kt-manager-link { color: var(--kt-accent); font-size: 12px; }
 .kt-search-area { position: relative; flex-shrink: 0; }
-.kt-root .kt-search, .kt-root .kt-source, .kt-root .kt-number {
+.kt-root .kt-search, .kt-root .kt-source, .kt-root .kt-number, .kt-root .kt-seed-group {
   appearance: none;
   border: 1px solid var(--kt-line);
   border-radius: 6px;
@@ -207,11 +207,16 @@
 .kt-root.kt-seeds { gap: 6px; padding: 8px; }
 .kt-root .kt-seed-row { display: flex; align-items: center; gap: 4px; }
 .kt-root .kt-seed-field { position: relative; flex: 1; min-width: 0; }
-.kt-root .kt-seed-field .kt-number { padding-right: 28px; }
+.kt-root .kt-seed-group { display: flex; flex: 1; min-width: 0; height: 29px; overflow: hidden; }
+.kt-root .kt-seed-field .kt-number { height: 100%; padding-right: 28px; border: 0; border-radius: 0; background: transparent; }
+.kt-root .kt-seed-group :focus-visible { outline-offset: -2px; }
 .kt-root .kt-seed-shuffle { appearance: none; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); min-width: 26px; height: 22px; padding: 0 4px; border: 0; border-radius: 5px; background: transparent; color: var(--kt-text); cursor: pointer; opacity: .45; font: 600 11px system-ui, sans-serif; }
 .kt-root .kt-seed-shuffle:hover { opacity: 1; background: #7098c322; }
 .kt-root .kt-seed-shuffle[data-active="true"] { opacity: 1; color: var(--kt-accent); background: #80b9f81c; }
 .kt-root .kt-seed-row .kt-button:disabled { opacity: .3; cursor: default; }
+.kt-root .kt-seed-step { min-width: 22px; min-height: 0; padding: 0 4px; border: 0; border-radius: 0; }
+.kt-root .kt-seed-step:first-child { border-right: 1px solid var(--kt-line); }
+.kt-root .kt-seed-step:last-child { border-left: 1px solid var(--kt-line); }
 .kt-seed-menu { position: fixed; z-index: 10000; width: 300px; padding: 6px; color: #e5eaf2; background: #20242b; border: 1px solid #4a5361; border-radius: 10px; box-shadow: 0 8px 24px #0009; font: 12px/1.4 system-ui, sans-serif; }
 .kt-seed-menu-title { padding: 4px 8px 6px; color: #9aa9bc; }
 .kt-seed-menu-item { appearance: none; display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; font: inherit; text-align: left; }

@@ -1,5 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+import { glyph } from "./icons.js";
 import { activeWords, addLora, reconcileWords, splitWords } from "./state.js";
 import "./styles.js";
 
@@ -310,15 +311,17 @@ function loaderWidget(node, name) {
       const identity = element("div", "kt-identity");
       identity.append(label);
 
-      const settings = button("⚙", `${open ? "Hide" : "Show"} link and CLIP settings for ${entry.name}`, () => {
+      const settings = button("", `${open ? "Hide" : "Show"} link and CLIP settings for ${entry.name}`, () => {
         if (expanded.has(entry.name)) expanded.delete(entry.name); else expanded.add(entry.name);
         render(JSON.parse(widget.value));
       });
       settings.classList.add("kt-icon");
+      settings.append(glyph("settings"));
       settings.setAttribute("aria-expanded", String(open));
       settings.classList.toggle("kt-attention", !linked);
-      const remove = button("×", `Remove ${entry.name}`, () => change(node, widget, JSON.parse(widget.value).filter((item) => item.name !== entry.name)));
+      const remove = button("", `Remove ${entry.name}`, () => change(node, widget, JSON.parse(widget.value).filter((item) => item.name !== entry.name)));
       remove.classList.add("kt-icon");
+      remove.append(glyph("trash"));
       const manager = managerLink(entry.name, "↗");
       manager.classList.add("kt-icon");
 
@@ -414,10 +417,10 @@ function loaderWidget(node, name) {
     }
   });
   widget.onRemove = () => { disposed = true; clearTimeout(timer); controller?.abort(); hidePreview(); };
+  widget.refreshSearch = () => { clearTimeout(timer); runSearch(); };
   return result;
 }
 
-  widget.refreshSearch = () => { clearTimeout(timer); runSearch(); };
 function triggerWidget(node, name) {
   const root = element("div", "kt-root kt-triggers");
   let widget;
@@ -443,10 +446,10 @@ function triggerWidget(node, name) {
     }
     heading.append(element("span", "kt-title", "Trigger words"), element("span", "kt-badge", `${count}/${total} active`), views);
     root.append(heading);
+    const absent = state.groups.length - visible.length;
     const list = element("div", "kt-list");
     if (!visible.length) {
       const empty = element("div", "kt-empty");
-    const absent = state.groups.length - visible.length;
       empty.append(element("strong", "", "Ready for trigger words"), element("span", "", "Connect your loader’s trigger_words output, or enter words below."));
       list.append(empty);
     }
@@ -500,10 +503,10 @@ function triggerWidget(node, name) {
         target.append(box);
       }
     }
+    if (absent) list.append(parked);
     root.append(list);
     list.scrollTop = scroll;
     previousList = list;
-    if (absent) list.append(parked);
     const editor = element("details", "kt-source-editor");
     const connected = node.inputs?.some((input) => input.name === "trigger_words" && input.link != null) || false;
     editor.open = !connected && !state.source;
@@ -547,15 +550,15 @@ app.registerExtension({
       const created = type.prototype.onNodeCreated;
       type.prototype.onNodeCreated = function () {
         created?.apply(this, arguments);
-        // Saved workflows restore their own choice when the node is configured afterwards.
-        const loader = this.widgets?.find((item) => item.name === "loader");
-        if (!loader) return;
         const family = this.widgets?.find((item) => item.name === "family");
         const loras = this.widgets?.find((item) => item.name === "loras");
         if (family && loras) {
           const changed = family.callback;
           family.callback = (...args) => { changed?.(...args); loras.refreshSearch(); };
         }
+        // Saved workflows restore their own choice when the node is configured afterwards.
+        const loader = this.widgets?.find((item) => item.name === "loader");
+        if (!loader) return;
         if (LiteGraph.registered_node_types[MANAGER_NODE]) loader.value = "LoRA Manager";
         else loader.options.values = ["ComfyUI"];
       };

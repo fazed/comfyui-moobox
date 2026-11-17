@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import vm from 'node:vm';
+import * as icons from '../web/icons.js';
 import * as seedstate from '../web/seedstate.js';
 
-const { afterRun, savedNode, validSeed } = seedstate;
+const { afterRun, savedNode, stepSeed, validSeed } = seedstate;
 
 // Loads seeds.js with a fake api whose queuePrompt succeeds or fails, and one Seeds node with id 3.
 async function queueHarness(queue) {
@@ -15,7 +16,7 @@ async function queueHarness(queue) {
   const url = new URL('../web/seeds.js', import.meta.url);
   const context = vm.createContext({ document: {}, JSON, Number, Math });
   const module = new vm.SourceTextModule(await readFile(url, 'utf8'), { context, initializeImportMeta: (meta) => { meta.url = url.href; } });
-  const mocks = { '../../scripts/app.js': { app }, '../../scripts/api.js': { api }, './seedstate.js': seedstate, './styles.js': {} };
+  const mocks = { '../../scripts/app.js': { app }, '../../scripts/api.js': { api }, './icons.js': icons, './seedstate.js': seedstate, './styles.js': {} };
   await module.link((specifier) => new vm.SyntheticModule(Object.keys(mocks[specifier]), function () {
     for (const [name, item] of Object.entries(mocks[specifier])) this.setExport(name, item);
   }, { context }));
@@ -52,6 +53,16 @@ test('after a run a seed follows its mode, and -1 stays random', () => {
   assert.equal(afterRun({ seed: 7 }, 7), 7);
   const next = afterRun({ seed: 7, mode: 'randomize' }, 7);
   assert.ok(Number.isSafeInteger(next) && next >= 0);
+});
+
+test('the stepper moves a seed by one, never below 0, and keeps -1 random on minus', () => {
+  assert.equal(stepSeed(41, 1), 42);
+  assert.equal(stepSeed(41, -1), 40);
+  assert.equal(stepSeed(1, -1), 0);
+  assert.equal(stepSeed(0, -1), 0);
+  assert.equal(stepSeed(-1, -1), -1);
+  assert.equal(stepSeed(-1, 1), 0);
+  assert.equal(stepSeed(Number.MAX_SAFE_INTEGER, 1), Number.MAX_SAFE_INTEGER);
 });
 
 test('only -1 and non-negative integers are seeds', () => {

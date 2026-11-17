@@ -5,6 +5,13 @@ export const randomSeed = () => Math.floor(Math.random() * MAX_RANDOM);
 // Only -1 means "random each time"; other negative values are not seeds.
 export const validSeed = (value) => Number.isSafeInteger(value) && value >= -1;
 
+// The seed after the stepper's - or + button; returns the seed itself when the step cannot change it.
+// -1 stays random on minus and becomes 0 on plus, and no seed goes below 0.
+export function stepSeed(seed, step) {
+  const next = Math.max(0, seed + step);
+  return (seed === -1 && step < 0) || !validSeed(next) ? seed : next;
+}
+
 export function afterRun({ seed, mode }, used) {
   if (seed === -1) return -1;
   if (mode === "increment") return used + 1;

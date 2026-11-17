@@ -1,16 +1,17 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { afterRun, randomSeed, savedNode, validSeed } from "./seedstate.js";
+import { glyph } from "./icons.js";
+import { afterRun, randomSeed, savedNode, stepSeed, validSeed } from "./seedstate.js";
 import "./styles.js";
 
 const SEEDS = "MooBoxSeeds";
 const MAX_SEEDS = 16;
 const ROW_HEIGHT = 38;
 const MODES = {
-  fixed: { icon: "📌", label: "Fixed", info: "Leaves the value unchanged" },
+  fixed: { icon: "pin", label: "Fixed", info: "Leaves the value unchanged" },
   increment: { icon: "+1", label: "Increment", info: "Adds 1 after each run" },
   decrement: { icon: "-1", label: "Decrement", info: "Subtracts 1 after each run" },
-  randomize: { icon: "🔀", label: "Randomize", info: "Picks a new random value after each run" },
+  randomize: { icon: "shuffle", label: "Randomize", info: "Picks a new random value after each run" },
 };
 let menu;
 
@@ -51,8 +52,9 @@ function element(tag, className, text) {
   return el;
 }
 
-function button(text, title, action) {
-  const el = element("button", "kt-button kt-icon", text);
+function button(content, title, action) {
+  const el = element("button", "kt-button kt-icon");
+  el.append(content);
   el.type = "button";
   el.title = title;
   el.setAttribute("aria-label", title);
@@ -83,9 +85,9 @@ function seedsWidget(node, name) {
     root.replaceChildren();
     const all = element("div", "kt-seed-all");
     all.append(element("span", "kt-seed-all-label", "All seeds"),
-      button("🔁", "Random each time: set every seed to -1", () => commit(state.map((entry) => ({ ...entry, seed: -1 })))),
-      button("✨", "New fixed random: pick a new seed for every row", () => commit(state.map((entry) => ({ ...entry, seed: randomSeed() })))),
-      button("♻", "Use last used seeds: restore every row that has one", () => commit(state.map((entry) => ({ ...entry, seed: entry.last ?? entry.seed })))));
+      button(glyph("repeat"), "Random each time: set every seed to -1", () => commit(state.map((entry) => ({ ...entry, seed: -1 })))),
+      button(glyph("dice"), "New fixed random: pick a new seed for every row", () => commit(state.map((entry) => ({ ...entry, seed: randomSeed() })))),
+      button(glyph("history"), "Use last used seeds: restore every row that has one", () => commit(state.map((entry) => ({ ...entry, seed: entry.last ?? entry.seed })))));
     root.append(all);
     state.forEach((entry, index) => {
       const row = element("div", "kt-seed-row");
@@ -103,21 +105,31 @@ function seedsWidget(node, name) {
       });
       const mode = entry.mode ?? "fixed";
       const random = entry.seed === -1;
-      const shuffle = element("button", "kt-seed-shuffle", random ? "🔀" : MODES[mode].icon);
+      const shuffle = element("button", "kt-seed-shuffle");
+      shuffle.append(glyph(random ? "shuffle" : MODES[mode].icon));
       shuffle.type = "button";
       shuffle.dataset.active = String(random || mode !== "fixed");
       shuffle.title = random ? "Random each time (-1). Click to choose what happens after a run" : `${MODES[mode].label}: ${MODES[mode].info}. Click to change`;
       shuffle.setAttribute("aria-label", "Update the seed after running");
       shuffle.addEventListener("click", (event) => { event.stopPropagation(); openMenu(shuffle, mode, (next) => update(index, { mode: next })); });
       field.append(input, shuffle);
+      const [minus, plus] = [[-1, "−", "Decrease seed by 1"], [1, "+", "Increase seed by 1"]].map(([step, text, title]) => {
+        const next = stepSeed(entry.seed, step);
+        const stepper = button(text, title, () => update(index, { seed: next }));
+        stepper.classList.add("kt-seed-step");
+        stepper.disabled = next === entry.seed;
+        return stepper;
+      });
 
-      const each = button("🔁", "Random each time: a new seed on every run (-1)", () => update(index, { seed: -1 }));
-      const fresh = button("✨", "New fixed random: pick one new seed now and keep it", () => update(index, { seed: randomSeed() }));
-      const last = button("♻", entry.last == null ? "No seed used yet" : `Use last used seed: ${entry.last}`, () => update(index, { seed: entry.last }));
+      const each = button(glyph("repeat"), "Random each time: a new seed on every run (-1)", () => update(index, { seed: -1 }));
+      const fresh = button(glyph("dice"), "New fixed random: pick one new seed now and keep it", () => update(index, { seed: randomSeed() }));
+      const last = button(glyph("history"), entry.last == null ? "No seed used yet" : `Use last used seed: ${entry.last}`, () => update(index, { seed: entry.last }));
       last.disabled = entry.last == null;
-      const remove = button("×", `Remove seed ${index + 1}`, () => commit(state.filter((_, i) => i !== index)));
+      const remove = button(glyph("trash"), `Remove seed ${index + 1}`, () => commit(state.filter((_, i) => i !== index)));
       remove.disabled = state.length === 1;
-      row.append(field, each, fresh, last, remove);
+      const group = element("div", "kt-seed-group");
+      group.append(minus, field, plus);
+      row.append(group, each, fresh, last, remove);
       root.append(row);
     });
     const add = button("+ Add seed", "Add a seed and output", () => commit([...state, { seed: -1, last: null }]));
