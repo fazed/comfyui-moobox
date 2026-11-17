@@ -44,12 +44,14 @@ class MooBoxLoraLoader(io.ComfyNode):
                 io.String.Input("loras", default="[]", extra_dict={"widgetType": "MOOBOX_LORAS"}),
                 io.Clip.Input("clip", optional=True),
                 io.Combo.Input("loader", options=["ComfyUI", "LoRA Manager"], default="ComfyUI", advanced=True),
+                io.Combo.Input("family", options=["Any", "SDXL", "Anima", "Krea 2", "MOSS", "Unknown"], default="Any", optional=True, socketless=True,
+                               tooltip="Only show LoRAs of this model family in the search, read from the file header. SDXL also covers Illustrious, NoobAI, Pony and SD 1.5. Unknown lists files that match no family. Search filter only; added LoRAs are kept."),
             ],
             outputs=[io.Model.Output("MODEL"), io.Clip.Output("CLIP"), io.String.Output("trigger_words"), io.String.Output("loaded_loras")],
         )
 
     @classmethod
-    def execute(cls, model, loras, clip=None, loader="ComfyUI"):
+    def execute(cls, model, loras, clip=None, loader="ComfyUI", family="Any"):
         if loader not in ("ComfyUI", "LoRA Manager"):
             raise ValueError("Unknown LoRA loader.")
         entries = read_state(loras)

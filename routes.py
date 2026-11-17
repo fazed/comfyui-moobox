@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import struct
 
 import aiohttp
 from aiohttp import web
@@ -11,6 +12,7 @@ import folder_paths
 from server import PromptServer
 
 from .jobs import install as install_jobs
+from .logic import lora_family
 from .nodes import TAGS_FILE, resolve_lora
 
 install_jobs(PromptServer.instance)
@@ -36,12 +38,40 @@ def embedded_words(name: str) -> list[str]:
     return [word for word in value if isinstance(word, str) and word.strip()]
 
 
+# Header classifications by path, valid while size and mtime are unchanged; memory only.
+_families: dict[str, tuple[tuple[int, int], str]] = {}
+
+
+def file_family(name: str) -> str:
+    path = folder_paths.get_full_path("loras", name)
+    if path is None or not path.lower().endswith(".safetensors"):
+        return "Unknown"
+    stat = os.stat(path)
+    key = (stat.st_size, stat.st_mtime_ns)
+    cached = _families.get(path)
+    if cached is None or cached[0] != key:
+        try:
+            header = comfy.utils.safetensors_header(path)
+            tensors = json.loads(header) if header else {}
+        except (OSError, struct.error, ValueError):
+            tensors = {}
+        tensors.pop("__metadata__", None)
+        cached = _families[path] = (key, lora_family(tensors))
+    return cached[1]
+
+
+def search_names(query: list[str], family: str) -> list[str]:
+    names = [name for name in folder_paths.get_filename_list("loras") if all(word in name.casefold() for word in query)]
+    return names if family == "Any" else [name for name in names if file_family(name) == family]
+
+
 @PromptServer.instance.routes.get("/moobox-lora/search")
 async def search(request: web.Request) -> web.Response:
     query = request.query.get("q", "").casefold().split()
-    names = await asyncio.to_thread(folder_paths.get_filename_list, "loras")
-    matching = [name for name in names if all(word in name.casefold() for word in query)]
-    return web.json_response({"names": matching[:50], "total": len(matching)})
+    offset = request.query.get("offset", "")
+    offset = int(offset) if offset.isdecimal() else 0
+    matching = await asyncio.to_thread(search_names, query, request.query.get("family", "Any"))
+    return web.json_response({"names": matching[offset:offset + 50], "total": len(matching)})
 
 
 @PromptServer.instance.routes.get("/moobox-lora/words")

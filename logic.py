@@ -129,6 +129,26 @@ def order_illustrious(text: str, categories: dict[str, int], quality_first: bool
     return ", ".join(sorted(split_words(format_tags(text)), key=bucket))
 
 
+# Checked in order: the specific layouts first, then the shared SD/SDXL UNet names.
+LORA_FAMILY_KEYS = (
+    ("Krea 2", re.compile(r"diffusion_model\.blocks\.\d+\.attn\.wq\.lora_A\.weight$"), 6144),
+    ("MOSS", re.compile(r"lora_unet_layers_\d+_proj_q\.lora_down\.weight$"), 3072),
+    ("Anima", re.compile(r"lora_unet_blocks_\d+_(self|cross)_attn_q_proj\.lora_down\.weight$"), 2048),
+)
+SD_UNET_PARTS = ("lora_unet_input_blocks", "lora_unet_middle_block", "lora_unet_output_blocks", "lora_unet_down_blocks", "lora_unet_up_blocks", "lora_unet_mid_block")
+
+
+def lora_family(header: dict) -> str:
+    for family, pattern, width in LORA_FAMILY_KEYS:
+        for key, value in header.items():
+            shape = value.get("shape") if isinstance(value, dict) else None
+            if pattern.search(key) and isinstance(shape, list) and len(shape) > 1 and shape[1] == width:
+                return family
+    if any(part in key for key in header for part in SD_UNET_PARTS):
+        return "SDXL"
+    return "Unknown"
+
+
 def resolution_label(width: int, height: int) -> str:
     shape = "Square" if width == height else "Portrait" if width < height else "Landscape"
     divisor = math.gcd(width, height)

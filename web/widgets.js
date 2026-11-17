@@ -356,27 +356,39 @@ function loaderWidget(node, name) {
     status.textContent = "Searching…";
     try {
       const manager = node.widgets?.find((item) => item.name === "loader")?.value === "LoRA Manager";
-      const data = await json(manager
-        ? `/lm/loras/relative-paths?search=${encodeURIComponent(query)}&limit=50`
-        : `/moobox-lora/search?q=${encodeURIComponent(query)}`, { signal: request.signal });
-      if (disposed || request.signal.aborted || query !== search.value.trim()) return;
-      const names = data.names || data.relative_paths || [];
+      const family = node.widgets?.find((item) => item.name === "family")?.value ?? "Any";
+      // LoRA Manager returns at most 50 matches, so a family filter searches the full list here instead.
+      const native = !manager || family !== "Any";
       selected = 0;
-      results.replaceChildren(...names.map((name) => {
-        const choice = button("", `Add ${name}`, () => select(name));
-        const parts = name.replaceAll("\\", "/").split("/");
-        const title = parts.pop().replace(/\.(safetensors|ckpt|pt|bin)$/i, "");
-        const thumb = element("img", "kt-thumb");
-        thumb.alt = "";
-        thumb.loading = "lazy";
-        thumb.addEventListener("error", () => { thumb.style.visibility = "hidden"; });
-        thumb.src = previewUrl(name);
-        choice.append(thumb, element("span", "kt-result-name", title), element("span", "kt-result-folder", parts.join(" / ") || "LoRA library"));
-        if (JSON.parse(widget.value).some((entry) => entry.name === name)) choice.append(element("span", "kt-result-add", "Added"));
-        return choice;
-      }));
-      results.children[0]?.classList.add("kt-selected");
-      status.textContent = names.length ? "Choose a result or press Enter to add it." : "No matching LoRAs";
+      let offset = 0;
+      let more;
+      do {
+        const data = await json(native
+          ? `/moobox-lora/search?q=${encodeURIComponent(query)}${family === "Any" ? "" : `&family=${encodeURIComponent(family)}`}${offset ? `&offset=${offset}` : ""}`
+          : `/lm/loras/relative-paths?search=${encodeURIComponent(query)}&limit=50`, { signal: request.signal });
+        if (disposed || request.signal.aborted || query !== search.value.trim()) return;
+        const names = data.names || data.relative_paths || [];
+        // Later pages append without touching the highlighted result.
+        results.append(...names.map((name) => {
+          const choice = button("", `Add ${name}`, () => select(name));
+          const parts = name.replaceAll("\\", "/").split("/");
+          const title = parts.pop().replace(/\.(safetensors|ckpt|pt|bin)$/i, "");
+          const thumb = element("img", "kt-thumb");
+          thumb.alt = "";
+          thumb.loading = "lazy";
+          thumb.addEventListener("error", () => { thumb.style.visibility = "hidden"; });
+          thumb.src = previewUrl(name);
+          choice.append(thumb, element("span", "kt-result-name", title), element("span", "kt-result-folder", parts.join(" / ") || "LoRA library"));
+          if (JSON.parse(widget.value).some((entry) => entry.name === name)) choice.append(element("span", "kt-result-add", "Added"));
+          return choice;
+        }));
+        if (!offset) results.children[0]?.classList.add("kt-selected");
+        offset += names.length;
+        more = native && names.length > 0 && offset < data.total;
+        status.textContent = !offset ? "No matching LoRAs"
+          : more ? `Showing ${offset} of ${data.total}…`
+          : `${native ? `${data.total} ${data.total === 1 ? "match" : "matches"}. ` : ""}Choose a result or press Enter to add it.`;
+      } while (more);
     } catch (error) {
       if (!disposed && error.name !== "AbortError") status.textContent = "Search unavailable. Check the selected loader in the advanced settings.";
     }
@@ -389,7 +401,7 @@ function loaderWidget(node, name) {
   });
   search.addEventListener("keydown", (event) => {
     const choices = [...results.children];
-    if (event.key === "Escape") { results.replaceChildren(); return; }
+    if (event.key === "Escape") { controller?.abort(); results.replaceChildren(); return; }
     if (!choices.length) return;
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault(); event.stopPropagation();
@@ -405,6 +417,7 @@ function loaderWidget(node, name) {
   return result;
 }
 
+  widget.refreshSearch = () => { clearTimeout(timer); runSearch(); };
 function triggerWidget(node, name) {
   const root = element("div", "kt-root kt-triggers");
   const open = new Set();
@@ -537,6 +550,12 @@ app.registerExtension({
   beforeRegisterNodeDef(type, data) {
     if (data.name !== LOADER && data.name !== TRIGGERS) return;
     const previous = type.prototype.onExecuted;
+        const family = this.widgets?.find((item) => item.name === "family");
+        const loras = this.widgets?.find((item) => item.name === "loras");
+        if (family && loras) {
+          const changed = family.callback;
+          family.callback = (...args) => { changed?.(...args); loras.refreshSearch(); };
+        }
     type.prototype.onExecuted = function (message) {
       previous?.apply(this, arguments);
       if (data.name === LOADER && message.trigger_words) syncConnected(this, message.trigger_words[0]);

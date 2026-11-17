@@ -127,6 +127,135 @@ test('late search responses cannot replace results for a newer query', async () 
 });
 
 test('trigger factory restores groups before interaction and preserves child switches', async () => {
+test('native search sends the chosen family and a family change refreshes the results', async () => {
+  const paths = [];
+  const { node, extension } = await harness(async (path) => {
+    paths.push(path);
+    return { ok: true, json: async () => ({ names: [path.includes('family=SDXL') ? 'sdxl.safetensors' : 'any.safetensors'] }) };
+  });
+  const type = { prototype: {} };
+  extension.beforeRegisterNodeDef(type, { name: 'MooBoxLoraLoader' });
+  const { widget } = extension.getCustomWidgets().MOOBOX_LORAS(node, 'loras');
+  const family = { name: 'family', value: 'Any', callback: () => { family.changed = true; } };
+  node.widgets.push(family);
+  type.prototype.onNodeCreated.call(node);
+  const search = find(widget.element, (el) => el.type === 'search');
+  const results = find(widget.element, (el) => el.className === 'kt-results');
+  search.value = 'style'; search.dispatchEvent(new Event('input'));
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  assert.equal(paths.at(-1), '/moobox-lora/search?q=style');
+  family.value = 'SDXL';
+  family.callback('SDXL');
+  assert.equal(family.changed, true);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(paths.at(-1), '/moobox-lora/search?q=style&family=SDXL');
+  assert.equal(results.children[0].children[1].textContent, 'sdxl');
+  family.value = 'Krea 2';
+  family.callback('Krea 2');
+  assert.equal(paths.at(-1), '/moobox-lora/search?q=style&family=Krea%202');
+  widget.onRemove();
+});
+
+test('LoRA Manager search uses the full MooBox search when a family is chosen', async () => {
+  const paths = [];
+  const { node, extension } = await harness(async (path) => {
+    paths.push(path);
+    return { ok: true, json: async () => (path.startsWith('/lm/') ? { relative_paths: ['manager.safetensors'] } : { names: ['sdxl.safetensors'] }) };
+  });
+  const { widget } = extension.getCustomWidgets().MOOBOX_LORAS(node, 'loras');
+  const family = { name: 'family', value: 'Any' };
+  node.widgets.push({ name: 'loader', value: 'LoRA Manager' }, family);
+  const search = find(widget.element, (el) => el.type === 'search');
+  const results = find(widget.element, (el) => el.className === 'kt-results');
+  search.value = 'concept'; search.dispatchEvent(new Event('input'));
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  assert.equal(paths.at(-1), '/lm/loras/relative-paths?search=concept&limit=50');
+  assert.equal(results.children[0].children[1].textContent, 'manager');
+  family.value = 'SDXL';
+  widget.refreshSearch();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(paths.at(-1), '/moobox-lora/search?q=concept&family=SDXL');
+  assert.equal(results.children[0].children[1].textContent, 'sdxl');
+  widget.onRemove();
+});
+
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+const key = (target, name) => target.dispatchEvent(Object.assign(new Event('keydown'), { key: name }));
+const pageOf = (path, total) => {
+  const offset = Number(new URL(path, 'http://local').searchParams.get('offset') ?? 0);
+  return { names: Array.from({ length: Math.max(0, Math.min(50, total - offset)) }, (_, index) => `lora_${offset + index}.safetensors`), total };
+};
+
+test('native search appends every page in order and keeps the highlighted result', async () => {
+  const paths = [];
+  let release;
+  const { node, extension } = await harness(async (path) => {
+    if (path.includes('/words')) return { ok: true, json: async () => ({ words: [] }) };
+    paths.push(path);
+    if (path.endsWith('offset=50')) await new Promise((resolve) => { release = resolve; });
+    return { ok: true, json: async () => pageOf(path, 120) };
+  });
+  const { widget } = extension.getCustomWidgets().MOOBOX_LORAS(node, 'loras');
+  const search = find(widget.element, (el) => el.type === 'search');
+  const results = find(widget.element, (el) => el.className === 'kt-results');
+  const status = find(widget.element, (el) => el.className === 'kt-status');
+  search.value = 'lora'; search.dispatchEvent(new Event('input'));
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  assert.equal(results.children.length, 50);
+  assert.equal(status.textContent, 'Showing 50 of 120…');
+  key(search, 'ArrowDown'); key(search, 'ArrowDown');
+  release();
+  for (let index = 0; index < 5; index++) await tick();
+  assert.deepEqual(paths, ['/moobox-lora/search?q=lora', '/moobox-lora/search?q=lora&offset=50', '/moobox-lora/search?q=lora&offset=100']);
+  assert.equal(results.children.length, 120);
+  assert.equal(results.children[119].children[1].textContent, 'lora_119');
+  assert.equal(status.textContent, '120 matches. Choose a result or press Enter to add it.');
+  key(search, 'Enter');
+  await tick();
+  assert.equal(JSON.parse(widget.value)[0].name, 'lora_2.safetensors');
+  widget.onRemove();
+});
+
+test('changing the query stops loading the pages of the old query', async () => {
+  const paths = [];
+  let release;
+  const { node, extension } = await harness(async (path) => {
+    paths.push(path);
+    if (path.endsWith('q=old&offset=50')) await new Promise((resolve) => { release = resolve; });
+    return { ok: true, json: async () => pageOf(path, path.includes('q=old') ? 200 : 3) };
+  });
+  const { widget } = extension.getCustomWidgets().MOOBOX_LORAS(node, 'loras');
+  const search = find(widget.element, (el) => el.type === 'search');
+  const results = find(widget.element, (el) => el.className === 'kt-results');
+  search.value = 'old'; search.dispatchEvent(new Event('input'));
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  search.value = 'new'; search.dispatchEvent(new Event('input'));
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  release();
+  for (let index = 0; index < 5; index++) await tick();
+  assert.deepEqual(paths, ['/moobox-lora/search?q=old', '/moobox-lora/search?q=old&offset=50', '/moobox-lora/search?q=new']);
+  assert.equal(results.children.length, 3);
+  widget.onRemove();
+});
+
+test('LoRA Manager search without a family stays a single page of 50', async () => {
+  const paths = [];
+  const { node, extension } = await harness(async (path) => {
+    paths.push(path);
+    return { ok: true, json: async () => ({ relative_paths: pageOf('/?offset=0', 50).names, total: 300 }) };
+  });
+  const { widget } = extension.getCustomWidgets().MOOBOX_LORAS(node, 'loras');
+  node.widgets.push({ name: 'loader', value: 'LoRA Manager' });
+  const search = find(widget.element, (el) => el.type === 'search');
+  const results = find(widget.element, (el) => el.className === 'kt-results');
+  search.value = 'concept'; search.dispatchEvent(new Event('input'));
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  await tick();
+  assert.deepEqual(paths, ['/lm/loras/relative-paths?search=concept&limit=50']);
+  assert.equal(results.children.length, 50);
+  widget.onRemove();
+});
+
   const { node, extension } = await harness();
   const { widget } = extension.getCustomWidgets().MOOBOX_TRIGGERS(node, 'selection');
   const value = state.reconcileWords({ groups: [] }, 'alpha, beta');
