@@ -14,6 +14,8 @@ from logic import split_words
 GROUP_NODES = {"Fast Groups Bypasser (rgthree)": "bypass", "Fast Groups Muter (rgthree)": "mute"}
 # rgthree settings without a Groups Toggle equivalent, with their rgthree defaults.
 DROPPED_SETTINGS = {"toggleRestriction": "default", "showNav": True, "customSortAlphabet": ""}
+# rgthree Seed's random range; MooBox Seeds always picks from 0 to 2**50.
+SEED_RANGE = {"randomMin": 0, "randomMax": 1125899906842624}
 
 
 def unweight(text: str) -> tuple[str, float]:
@@ -30,10 +32,36 @@ def convert_workflow(workflow: dict) -> tuple[dict, int, list[str]]:
         nonlocal count
         for node in graph.get("nodes", []):
             kind = node.get("type")
+            name = f"{node.get('title') or kind} (node {node.get('id')})"
+            if kind == "Seed (rgthree)" and not any(item.get("link") is not None for item in node.get("inputs", [])):
+                properties = node.get("properties", {})
+                dropped.extend(f"{name}: {key} = {properties[key]!r}" for key, default in SEED_RANGE.items() if properties.get(key, default) != default)
+                seed = node.get("widgets_values", [-1])[0]
+                if seed in (-2, -3):
+                    dropped.append(f"{name}: seed {seed} ({'increment' if seed == -2 else 'decrement'} last seed) became -1 (random each time)")
+                    seed = -1
+                links = node["outputs"][0].get("links") if node.get("outputs") else None
+                node["type"] = "MooBoxSeeds"
+                node["inputs"] = [{"localized_name": "seeds", "name": "seeds", "type": "STRING", "widget": {"name": "seeds"}, "link": None}]
+                node["outputs"] = [{"localized_name": "seed_1", "name": "seed_1", "type": "INT", "links": links}]
+                node["widgets_values"] = [json.dumps([{"seed": seed, "last": None}])]
+                node["properties"] = {"Node name for S&R": node["type"]}
+                count += 1
+                continue
+            if kind == "Image Comparer (rgthree)" and not any(output.get("links") for output in node.get("outputs", [])):
+                links = [item.get("link") for item in node.get("inputs", [])] + [None]
+                node["type"] = "MooBoxImageCompare"
+                node["inputs"] = [{"localized_name": f"image{i}", "name": f"images.image{i}", "type": "IMAGE", "link": link, **({"shape": 7} if i >= 2 else {})} for i, link in enumerate(links)]
+                node["outputs"] = []
+                node["widgets_values"] = []
+                node.pop("widgets_values_named", None)
+                mode = "ab" if node.get("properties", {}).get("comparer_mode") == "Click" else "slider"
+                node["properties"] = {"Node name for S&R": node["type"], "compare": {"a": None, "b": None, "mode": mode, "position": 50}}
+                count += 1
+                continue
             if kind in GROUP_NODES and not any(output.get("links") for output in node.get("outputs", [])):
                 properties = node.setdefault("properties", {})
                 sort = properties.get("sort")
-                name = f"{node.get('title') or kind} (node {node.get('id')})"
                 dropped.extend(f"{name}: {key} = {properties[key]!r}" for key, default in DROPPED_SETTINGS.items() if properties.get(key, default) != default)
                 if sort == "custom alphabet":
                     dropped.append(f"{name}: sort 'custom alphabet' became 'position'")
@@ -120,10 +148,10 @@ def main():
         sys.exit(f"Nothing written: {error}")
     print(f"Converted {count} nodes: {output}")
     if dropped:
-        print("Settings without a Groups Toggle equivalent (dropped):\n  " + "\n  ".join(dropped))
+        print("Settings without a MooBox equivalent (dropped):\n  " + "\n  ".join(dropped))
     left = sorted({match for match in re.findall(r'"type": "([^"]*\(rgthree\))"', output.read_text(encoding="utf-8"))})
     if left:
-        print("Still rgthree (no MooBox replacement): " + ", ".join(left))
+        print("Still rgthree (not converted): " + ", ".join(left))
 
 
 if __name__ == "__main__":

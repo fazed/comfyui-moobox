@@ -174,10 +174,12 @@ python3 migrate_workflow.py /path/to/workflow.json
 
 This writes `workflow-moobox.json`, keeps the connections and selections and sets the
 converted loaders to **LoRA Manager**. rgthree's Fast Groups Bypasser and Muter become
-**Groups Toggle** (those with a connected output are left alone); other rgthree nodes are listed. The original workflow is left untouched.
+**Groups Toggle** (those with a connected output are left alone), Seed becomes **Seeds** (one
+seed, same value; increment and decrement of the last seed become -1) and Image Comparer becomes
+**Image Compare**; rgthree nodes that were not converted are listed. The original workflow is left untouched.
 A loader with a connected text or `lora_stack` input is refused and needs manual conversion;
 nothing is written then, and an existing output file is never overwritten. rgthree settings
-without a Groups Toggle equivalent (toggle restriction, navigation, custom sort alphabet) are listed.
+without a MooBox equivalent (toggle restriction, navigation, custom sort alphabet, seed range) are listed.
 
 Keep a backup of this folder. ComfyUI updates may, as with other node packs, require changes.
 

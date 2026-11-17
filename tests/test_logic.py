@@ -130,6 +130,44 @@ class MigrationTests(unittest.TestCase):
         _, _, dropped = convert_workflow({"nodes": [{"type": "Fast Groups Muter (rgthree)", "properties": {"showNav": True, "toggleRestriction": "default"}}]})
         self.assertEqual(dropped, [])
 
+    def test_rgthree_seed_becomes_moobox_seeds(self):
+        workflow = {"nodes": [
+            {"id": 1, "type": "Seed (rgthree)", "title": "Detail Seed", "pos": [10, 20], "inputs": [], "outputs": [{"name": "SEED", "type": "INT", "slot_index": 0, "links": [5, 6]}], "widgets_values": [123, "", "", "okay"], "properties": {"randomMin": 0, "randomMax": 1125899906842624}},
+            {"id": 2, "type": "Seed (rgthree)", "outputs": [{"name": "SEED", "links": None}], "widgets_values": [-2, None, "", None], "properties": {"randomMax": 1000}},
+            {"id": 3, "type": "Seed (rgthree)", "inputs": [{"name": "seed", "link": 7}], "widgets_values": [0]},
+            {"id": 4, "type": "KSampler", "inputs": [{"name": "seed", "link": 5}]}],
+            "definitions": {"subgraphs": [{"nodes": [{"id": 9, "type": "Seed (rgthree)", "widgets_values": [-1, "", "", "okay"]}]}]},
+            "links": [[5, 1, 0, 4, 0, "INT"], [6, 1, 0, 4, 1, "INT"]]}
+        converted, count, dropped = convert_workflow(workflow)
+        self.assertEqual(count, 3)
+        self.assertEqual(converted["links"], workflow["links"])
+        seed, increment, linked, _ = converted["nodes"]
+        self.assertEqual((seed["type"], seed["title"], seed["pos"]), ("MooBoxSeeds", "Detail Seed", [10, 20]))
+        self.assertEqual(json.loads(seed["widgets_values"][0]), [{"seed": 123, "last": None}])
+        self.assertEqual((seed["outputs"][0]["name"], seed["outputs"][0]["links"]), ("seed_1", [5, 6]))
+        self.assertEqual(json.loads(increment["widgets_values"][0])[0]["seed"], -1)
+        self.assertEqual(linked["type"], "Seed (rgthree)")
+        nested = converted["definitions"]["subgraphs"][0]["nodes"][0]
+        self.assertEqual(json.loads(nested["widgets_values"][0])[0]["seed"], -1)
+        self.assertEqual(dropped, ["Seed (rgthree) (node 2): randomMax = 1000", "Seed (rgthree) (node 2): seed -2 (increment last seed) became -1 (random each time)"])
+
+    def test_rgthree_image_comparer_becomes_image_compare(self):
+        workflow = {"nodes": [
+            {"id": 1, "type": "VAEDecode", "outputs": [{"name": "IMAGE", "links": [7]}]},
+            {"id": 2, "type": "Image Comparer (rgthree)", "title": "Compare", "pos": [5, 6], "inputs": [{"name": "image_a", "type": "IMAGE", "link": None}, {"name": "image_b", "type": "IMAGE", "link": 7}],
+             "outputs": [{"name": "images", "type": "IMAGE", "links": None}], "widgets_values": [[]], "widgets_values_named": {"rgthree_comparer": {"images": []}}, "properties": {"comparer_mode": "Click"}},
+            {"id": 3, "type": "Image Comparer (rgthree)", "inputs": [], "outputs": [{"name": "images", "links": [8]}]}],
+            "links": [[7, 1, 0, 2, 1, "IMAGE"]]}
+        converted, count, _ = convert_workflow(workflow)
+        self.assertEqual(count, 1)
+        self.assertEqual(converted["links"], [[7, 1, 0, 2, 1, "IMAGE"]])
+        compare, linked = converted["nodes"][1:]
+        self.assertEqual((compare["type"], compare["title"], compare["pos"], compare["outputs"]), ("MooBoxImageCompare", "Compare", [5, 6], []))
+        self.assertEqual([(item["name"], item["link"]) for item in compare["inputs"]], [("images.image0", None), ("images.image1", 7), ("images.image2", None)])
+        self.assertNotIn("widgets_values_named", compare)
+        self.assertEqual(compare["properties"]["compare"]["mode"], "ab")
+        self.assertEqual(linked["type"], "Image Comparer (rgthree)")
+
     def test_cli_refuses_to_overwrite_and_reports_errors(self):
         script = Path(__file__).resolve().parents[1] / "migrate_workflow.py"
         with tempfile.TemporaryDirectory() as folder:
