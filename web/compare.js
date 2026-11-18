@@ -30,7 +30,7 @@ function setSource(img, url) {
 }
 
 function compareWidgets(node) {
-  const state = node.properties.compare ??= { a: null, b: null, mode: "slider", position: 50 };
+  let state = node.properties.compare ??= { a: null, b: null, mode: "slider", position: 50 };
   const files = new Map();
 
   const wrap = element("div", "mb-compare");
@@ -180,6 +180,8 @@ function compareWidgets(node) {
   show();
   return {
     refresh: show,
+    // configure replaces the saved properties, so follow the loaded object.
+    configure() { state = node.properties.compare ??= state; show(); },
     stop: () => resizer.disconnect(),
     load(saved) {
       files.clear();
@@ -207,7 +209,7 @@ app.registerExtension({
     const configured = type.prototype.onConfigure;
     type.prototype.onConfigure = function () {
       configured?.apply(this, arguments);
-      this.compare?.refresh();
+      this.compare?.configure();
     };
     const removed = type.prototype.onRemoved;
     type.prototype.onRemoved = function () {
