@@ -1,5 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { ALL, groupIsOn, nodesInside, nodesToSwitch, OFF_MODE, parseColors, pickGroups } from "./groupstate.js";
+import { glyph } from "./icons.js";
 import "./styles.js";
 
 const GROUPS = "MooBoxGroupsToggle";
@@ -25,18 +26,23 @@ function collectGroups(graph, path = [], seen = new Set()) {
 
 function groupsWidget(node) {
   const root = document.createElement("div");
-  root.className = "kt-root kt-groups";
+  root.className = "mb mb-groups";
   const bar = document.createElement("div");
-  bar.className = "kt-groups-bar";
+  bar.className = "mb-section-head";
+  const caption = document.createElement("span");
+  caption.className = "mb-label";
+  caption.textContent = "Groups";
+  const badge = document.createElement("span");
+  badge.className = "mb-badge";
   const reload = document.createElement("button");
   reload.type = "button";
-  reload.className = "kt-button";
-  reload.textContent = "↻ Refresh";
+  reload.className = "mb-btn";
+  reload.append(glyph("refresh"), "Refresh");
   reload.title = "Read the groups and their state again";
   reload.addEventListener("click", (event) => { event.stopPropagation(); refresh(); });
-  bar.append(reload);
+  bar.append(caption, badge, reload);
   const list = document.createElement("div");
-  list.className = "kt-groups-list";
+  list.className = "mb-groups-list";
   root.append(bar, list);
   let signature = "";
   let rows = 0;
@@ -66,31 +72,39 @@ function groupsWidget(node) {
     list.replaceChildren();
     if (!entries.length) {
       const empty = document.createElement("div");
-      empty.className = "kt-groups-empty";
+      empty.className = "mb-empty";
       empty.textContent = "No matching groups";
       list.append(empty);
     }
     let heading;
+    let active = 0;
     for (const { group, path, nodes } of entries) {
       const where = path.join(" › ");
       if (where !== heading && where) {
         const label = document.createElement("div");
-        label.className = "kt-group-path";
+        label.className = "mb-label mb-group-path";
         label.textContent = where;
         list.append(label);
       }
       heading = where;
       const on = groupIsOn(nodes);
+      if (on) active++;
       const row = document.createElement("div");
-      row.className = "kt-group-row";
-      const toggle = document.createElement("button");
-      toggle.type = "button";
-      toggle.className = "kt-group-toggle";
-      toggle.dataset.on = String(on);
-      toggle.setAttribute("role", "switch");
-      toggle.setAttribute("aria-checked", String(on));
-      toggle.setAttribute("aria-label", group.title);
-      toggle.addEventListener("click", (event) => {
+      row.className = "mb-group-row";
+      row.dataset.active = String(on);
+      const toggle = document.createElement("label");
+      toggle.className = "mb-switch";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = on;
+      input.setAttribute("role", "switch");
+      input.setAttribute("aria-label", group.title);
+      const track = document.createElement("span");
+      track.className = "mb-switch-track";
+      toggle.append(input, track);
+      input.addEventListener("click", (event) => {
+        // The rows are rebuilt from the group state; the checkbox keeps no state of its own.
+        event.preventDefault();
         event.stopPropagation();
         node.graph.beforeChange?.();
         const off = OFF_MODE[value("action")];
@@ -100,18 +114,19 @@ function groupsWidget(node) {
         refresh();
       });
       const swatch = document.createElement("span");
-      swatch.className = "kt-group-swatch";
+      swatch.className = "mb-group-swatch";
       swatch.style.background = group.color ?? "";
       const title = document.createElement("span");
-      title.className = "kt-group-title";
+      title.className = "mb-name";
       title.textContent = group.title;
       title.title = [...path, group.title].join(" › ");
       row.append(toggle, swatch, title);
       if (!path.length) {
         const go = document.createElement("button");
         go.type = "button";
-        go.className = "kt-group-go";
-        go.textContent = "→";
+        go.className = "mb-btn mb-group-go";
+        go.dataset.variant = "ghost";
+        go.append(glyph("goto"));
         go.title = "Go to group";
         go.setAttribute("aria-label", `Go to ${group.title}`);
         go.addEventListener("click", (event) => { event.stopPropagation(); app.canvas.centerOnNode(group); });
@@ -119,6 +134,7 @@ function groupsWidget(node) {
       }
       list.append(row);
     }
+    badge.textContent = `${active}/${entries.length} on`;
     rows = Math.max(entries.length, 1);
     const size = node.computeSize();
     if (node.size[1] < size[1]) node.setSize([node.size[0], size[1]]);

@@ -1,5 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+import "./styles.js";
 
 const COMPARE = "MooBoxImageCompare";
 const MODES = {
@@ -9,10 +10,6 @@ const MODES = {
   diff: ["Difference", "Orange shows where A and B differ, black where they match."],
   blink: ["Blink", "Switches between A and B automatically."],
 };
-const style = document.createElement("link");
-style.rel = "stylesheet";
-style.href = new URL("./compare.css", import.meta.url).href;
-document.head.append(style);
 
 function element(tag, className, text) {
   const el = document.createElement(tag);
@@ -36,43 +33,43 @@ function compareWidgets(node) {
   const state = node.properties.compare ??= { a: null, b: null, mode: "slider", position: 50 };
   const files = new Map();
 
-  const wrap = element("div", "kc-wrap");
-  const controls = element("div", "kc-root kc-controls");
-  const view = element("div", "kc-root kc-view");
-  const stage = element("div", "kc-stage");
-  const frame = element("div", "kc-frame");
+  const wrap = element("div", "mb-compare");
+  const controls = element("div", "mb mb-compare-controls");
+  const view = element("div", "mb mb-compare-view");
+  const stage = element("div", "mb-compare-stage");
+  const frame = element("div", "mb-compare-frame");
   const imgA = element("img");
   const imgB = element("img");
   const diff = element("canvas");
-  const line = element("div", "kc-line");
-  const tagA = element("span", "kc-tag");
-  const tagB = element("span", "kc-tag");
-  const empty = element("div", "kc-empty");
+  const line = element("div", "mb-compare-line");
+  const tagA = element("span", "mb-compare-tag");
+  const tagB = element("span", "mb-compare-tag");
+  const empty = element("div", "mb-empty mb-compare-empty");
   imgA.crossOrigin = imgB.crossOrigin = "anonymous";
   frame.append(imgA, imgB, diff, line, tagA, tagB);
   stage.append(frame, empty);
   view.append(stage);
 
   const choose = (key, label) => {
-    const select = element("select");
+    const select = element("select", "mb-input");
     select.setAttribute("aria-label", `Image ${label}`);
     select.addEventListener("change", () => { state[key] = Number(select.value); show(); });
-    const wrapper = element("label", "", label);
-    wrapper.append(select);
+    const wrapper = element("label", "mb-field");
+    wrapper.append(element("span", "mb-label", label), select);
     return { select, wrapper };
   };
   const first = choose("a", "A");
   const second = choose("b", "B");
-  const swap = element("button", "kc-swap", "⇄");
+  const swap = element("button", "mb-btn mb-compare-swap", "⇄");
   swap.type = "button";
   swap.title = "Swap A and B";
   swap.addEventListener("click", () => { [state.a, state.b] = [state.b, state.a]; show(); });
-  const mode = element("select");
+  const mode = element("select", "mb-input");
   mode.setAttribute("aria-label", "Comparison mode");
   for (const [key, [label, info]] of Object.entries(MODES)) mode.append(Object.assign(element("option"), { value: key, textContent: label, title: info }));
   mode.addEventListener("change", () => { state.mode = mode.value; state.showB = false; show(); });
-  const info = element("span", "kc-info", "ⓘ");
-  const modes = element("div", "kc-mode");
+  const info = element("span", "mb-compare-info", "ⓘ");
+  const modes = element("div", "mb-compare-mode");
   modes.append(mode, info);
   controls.append(first.wrapper, swap, second.wrapper, modes);
 

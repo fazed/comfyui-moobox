@@ -136,16 +136,16 @@ test("bars show progress where the mode says and hide when idle", () => {
     const bars = createBars(parent, source, () => {}, () => mode);
     const [top, tab] = parent.children;
     bars.render();
-    assert.ok(top.classes.has("mbj-bar-active"));
-    assert.ok(!tab.classes.has("mbj-bar-active"));
-    assert.ok(top.classes.has("mbj-bar-external"));
+    assert.ok(top.classes.has("mb-jobs-bar-active"));
+    assert.ok(!tab.classes.has("mb-jobs-bar-active"));
+    assert.ok(top.classes.has("mb-jobs-bar-external"));
     assert.equal(top.children[0].style.width, "50%");
     mode = "Both";
     bars.render();
-    assert.ok(tab.classes.has("mbj-bar-active"));
+    assert.ok(tab.classes.has("mb-jobs-bar-active"));
     source.snapshot = { jobs: [] };
     bars.render();
-    assert.ok(!top.classes.has("mbj-bar-active") && !tab.classes.has("mbj-bar-active"));
+    assert.ok(!top.classes.has("mb-jobs-bar-active") && !tab.classes.has("mb-jobs-bar-active"));
     bars.close();
     assert.ok(top.removed && tab.removed);
   } finally {
@@ -175,12 +175,12 @@ test("panel splits local from external, only local can stop, runs are collapsibl
     assert.ok(texts(local).includes("KSampler · Node 42 · 18 / 30 steps"));
     assert.ok(!texts(local).includes("Other"));
     assert.ok(texts(external).includes("read-only"));
-    const stops = node => all(node).filter(n => n.className === "mbj-stop");
+    const stops = node => all(node).filter(n => n.className === "mb-btn mb-job-stop");
     assert.equal(stops(local).length, 2);
     assert.equal(stops(external).length, 0);
     stops(local)[0].onclick();
     assert.deepEqual(stopped, ["local-run"]);
-    const runs = all(external).filter(n => String(n.className).startsWith("mbj-run"));
+    const runs = all(external).filter(n => String(n.className).startsWith("mb-job-run"));
     assert.equal(runs.length, 1);
     assert.equal(runs[0].tagName ?? "details", "details");
     close();

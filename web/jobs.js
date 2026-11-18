@@ -3,6 +3,7 @@ import { api } from "../../scripts/api.js";
 import { BAR_MODES, createBars, createPanel, createStore } from "./jobspanel.js";
 import { createWidget } from "./jobswidget.js";
 import { STATS_INTERVALS, createStatsWidget } from "./statswidget.js";
+import "./styles.js";
 
 const TAB = "moobox-jobs";
 const BAR_SETTING = "MooBox.Jobs.ProgressBar";
@@ -30,10 +31,6 @@ app.registerExtension({
     void stats?.refresh();
   },
   setup() {
-    const css = document.createElement("link");
-    css.rel = "stylesheet";
-    css.href = new URL("./jobs.css", import.meta.url).href;
-    document.head.append(css);
     const store = createStore(api);
     const openPanel = () => app.extensionManager.sidebarTab?.toggleSidebarTab?.(TAB);
     bars = createBars(document.body, store, openPanel, () => app.ui.settings.getSettingValue(BAR_SETTING));

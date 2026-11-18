@@ -113,7 +113,7 @@ export function element(tag, className = "", text) {
 }
 
 function bar(value, small = false, label = "Progress") {
-  const el = element("progress", small ? "mbj-bar mbj-bar-small" : "mbj-bar");
+  const el = element("progress", small ? "mb-job-bar mb-job-bar-node" : "mb-job-bar");
   el.max = 100;
   if (value !== null) el.value = value;
   el.setAttribute("aria-label", label);
@@ -125,8 +125,8 @@ const labels = { completed: "Completed", error: "Failed", interrupted: "Interrup
 function stepRows(job, primaryId) {
   const rows = [];
   const add = (id, state) => {
-    const row = element("div", "mbj-step");
-    row.append(element("span", "", `${nodeName(job, id)} · ${id}`), element("span", "mbj-muted", state));
+    const row = element("div", "mb-job-step");
+    row.append(element("span", "", `${nodeName(job, id)} · ${id}`), element("span", "mb-muted", state));
     rows.push(row);
   };
   for (const [id, node] of Object.entries(job.nodes || {})) {
@@ -139,14 +139,14 @@ function stepRows(job, primaryId) {
 }
 
 export function createPanel(el, store, stop) {
-  const root = element("section", "mbj");
+  const root = element("section", "mb mb-jobs");
   el.replaceChildren(root);
-  const header = element("header", "mbj-header");
-  const connection = element("span", "mbj-connection", "Connecting…");
+  const header = element("header", "mb-jobs-header");
+  const connection = element("span", "mb-badge mb-jobs-connection", "Connecting…");
   connection.setAttribute("role", "status");
   header.append(element("h2", "", "Jobs"), connection);
-  const local = element("div", "mbj-group");
-  const external = element("div", "mbj-group");
+  const local = element("div", "mb-jobs-group");
+  const external = element("div", "mb-jobs-group");
   root.append(header, local, external);
   const open = new Set();
 
@@ -162,7 +162,7 @@ export function createPanel(el, store, stop) {
   }
 
   function stopButton(job, label) {
-    const button = element("button", "mbj-stop", label);
+    const button = element("button", "mb-btn mb-job-stop", label);
     button.type = "button";
     button.title = job.status === "running" ? "Stop this build" : "Remove from queue";
     button.setAttribute("aria-label", button.title);
@@ -171,33 +171,33 @@ export function createPanel(el, store, stop) {
   }
 
   function runCard(job, canStop) {
-    const card = element("article", "mbj-card");
+    const card = element("article", "mb-card mb-job");
     const overall = overallProgress(job);
-    const headline = element("div", "mbj-headline");
-    headline.append(element("h3", "", "Workflow"), element("strong", "mbj-percent", overall === null ? "—" : `${Math.floor(overall)}%`));
+    const headline = element("div", "mb-job-head");
+    headline.append(element("h3", "", "Workflow"), element("strong", "mb-job-percent", overall === null ? "—" : `${Math.floor(overall)}%`));
     if (canStop) headline.append(stopButton(job, "Stop"));
     const overallBar = bar(overall, false, "Overall workflow progress (estimate)");
     overallBar.title = "Node-based estimate, not remaining time";
     card.append(headline, overallBar);
     const primary = primaryNode(job);
-    if (!primary) card.append(element("p", "mbj-hint", "Preparing node…"));
+    if (!primary) card.append(element("p", "mb-job-hint", "Preparing node…"));
     else {
       const [id, node] = primary;
       const percent = node.max > 1 ? progress(node.value, node.max) : null;
-      const line = element("div", "mbj-line");
-      const name = element("span", "mbj-node-name", nodeName(job, id));
+      const line = element("div", "mb-job-line");
+      const name = element("span", "mb-job-node-name", nodeName(job, id));
       name.title = nodeName(job, id);
-      line.append(name, element("span", "mbj-node-percent", percent === null ? "Reported active" : `${Math.round(percent)}%`));
+      line.append(name, element("span", "mb-job-node-percent", percent === null ? "Reported active" : `${Math.round(percent)}%`));
       const type = job.node_types?.[id];
       const description = `${type && type !== nodeName(job, id) ? `${type} · ` : ""}Node ${id}`;
-      const block = element("div", "mbj-node");
+      const block = element("div", "mb-job-node");
       block.append(line, bar(percent, true, `Node ${id} progress`),
-        element("p", "mbj-hint", percent === null ? description : `${description} · ${node.value} / ${node.max} steps`));
+        element("p", "mb-job-hint", percent === null ? description : `${description} · ${node.value} / ${node.max} steps`));
       card.append(block);
     }
     const steps = stepRows(job, primary?.[0]);
     if (steps.length) {
-      const run = details(`run:${job.prompt_id}`, "mbj-run", `Steps · ${steps.length}`);
+      const run = details(`run:${job.prompt_id}`, "mb-job-run", `Steps · ${steps.length}`);
       run.append(...steps);
       card.append(run);
     }
@@ -206,12 +206,12 @@ export function createPanel(el, store, stop) {
 
   function historyRun(job) {
     const steps = stepRows(job);
-    const run = details(`run:${job.prompt_id}`, `mbj-run mbj-state-${job.status}`, labels[job.status] || job.status,
-      element("code", "mbj-short-id", job.prompt_id.slice(0, 8)));
-    run.append(element("code", "mbj-job-id", job.prompt_id));
-    if (!steps.length) run.append(element("p", "mbj-muted", "No steps recorded."));
+    const run = details(`run:${job.prompt_id}`, `mb-job-run mb-job-${job.status}`, labels[job.status] || job.status,
+      element("code", "mb-job-short-id", job.prompt_id.slice(0, 8)));
+    run.append(element("code", "mb-job-id", job.prompt_id));
+    if (!steps.length) run.append(element("p", "mb-muted", "No steps recorded."));
     run.append(...steps);
-    if (job.status === "error") run.append(element("p", "mbj-muted", job.error_type || "See the server log for error details."));
+    if (job.status === "error") run.append(element("p", "mb-muted", job.error_type || "See the server log for error details."));
     return run;
   }
 
@@ -219,28 +219,28 @@ export function createPanel(el, store, stop) {
     const running = jobs.filter(job => job.status === "running");
     const waiting = jobs.filter(job => job.status === "queued").sort((a, b) => a.position - b.position);
     const finished = jobs.filter(job => !["running", "queued"].includes(job.status)).reverse();
-    const heading = element("div", "mbj-line mbj-title");
-    heading.append(element("span", "", title), element("span", "mbj-count", String(running.length + waiting.length)));
-    if (!isLocalGroup) heading.append(element("span", "mbj-badge", "read-only"));
+    const heading = element("div", "mb-section-head");
+    heading.append(element("span", "mb-label", title), element("span", "mb-badge", String(running.length + waiting.length)));
+    if (!isLocalGroup) heading.append(element("span", "mb-label mb-jobs-readonly", "read-only"));
     container.replaceChildren(heading);
-    if (!running.length) container.append(element("p", "mbj-muted mbj-idle", isLocalGroup ? "No active builds" : "No active external jobs"));
+    if (!running.length) container.append(element("p", "mb-muted mb-jobs-idle", isLocalGroup ? "No active builds" : "No active external jobs"));
     for (const job of running) container.append(runCard(job, isLocalGroup));
     for (const job of waiting) {
-      const row = element("div", "mbj-queue-row");
-      row.append(element("span", "mbj-muted", `#${job.position}`), element("code", "mbj-short-id", job.prompt_id));
+      const row = element("div", "mb-job-queue");
+      row.append(element("span", "mb-muted", `#${job.position}`), element("code", "mb-job-short-id", job.prompt_id));
       if (isLocalGroup) row.append(stopButton(job, "×"));
       container.append(row);
     }
-    const history = details(`history:${title}`, "mbj-history", `History · ${finished.length}`);
+    const history = details(`history:${title}`, "mb-job-history", `History · ${finished.length}`);
     for (const job of finished) history.append(historyRun(job));
-    if (!finished.length) history.append(element("p", "mbj-muted", "Finished jobs will appear here."));
+    if (!finished.length) history.append(element("p", "mb-muted", "Finished jobs will appear here."));
     container.append(history);
   }
 
   function render() {
     const online = store.online;
     connection.textContent = online ? "Live" : "Offline";
-    connection.className = online ? "mbj-connection mbj-online" : "mbj-connection";
+    connection.className = online ? "mb-badge mb-jobs-connection mb-jobs-online" : "mb-badge mb-jobs-connection";
     connection.title = online ? "Updates automatically" : "Displayed data may be stale";
     const jobs = store.snapshot?.jobs || [];
     renderGroup(local, "Local builds", jobs.filter(job => isLocal(job, store.tag)), true);
@@ -256,7 +256,7 @@ export const BAR_MODES = ["Top of window", "On Jobs icon", "Both"];
 
 function progressBar(tag, className, parent, openPanel) {
   const el = element(tag, className);
-  const fill = element("span", "mbj-bar-fill");
+  const fill = element("span", "mb-jobs-bar-fill");
   el.append(fill);
   if (openPanel) {
     el.type = "button";
@@ -268,8 +268,8 @@ function progressBar(tag, className, parent, openPanel) {
 
 // The top line and the line on the Jobs sidebar icon show the same job; the mode picks which exist.
 export function createBars(parent, store, openPanel, getMode) {
-  const top = progressBar("button", "mbj-topbar", parent, openPanel);
-  const tab = progressBar("span", "mbj-tabbar", parent);
+  const top = progressBar("button", "mb-jobs-topbar", parent, openPanel);
+  const tab = progressBar("span", "mb-jobs-tabbar", parent);
 
   // Inside the sidebar button the line follows the button's layout and its own click toggles the tab.
   function placeTabBar() {
@@ -286,10 +286,10 @@ export function createBars(parent, store, openPanel, getMode) {
     const title = job && [mine ? "Local build" : "External job", overall === null ? null : `${Math.floor(overall)}%`,
       primary ? nodeName(job, primary[0]) : null, "click for details"].filter(Boolean).join(" · ");
     for (const [bar, shown] of [[top, mode !== "On Jobs icon"], [tab, mode !== "Top of window"]]) {
-      bar.el.classList.toggle("mbj-bar-active", Boolean(job) && shown);
+      bar.el.classList.toggle("mb-jobs-bar-active", Boolean(job) && shown);
       if (!job) continue;
-      bar.el.classList.toggle("mbj-bar-external", !mine);
-      bar.el.classList.toggle("mbj-bar-unknown", overall === null);
+      bar.el.classList.toggle("mb-jobs-bar-external", !mine);
+      bar.el.classList.toggle("mb-jobs-bar-unknown", overall === null);
       bar.fill.style.width = overall === null ? "" : `${overall}%`;
       bar.el.title = title;
     }

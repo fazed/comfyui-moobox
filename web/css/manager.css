@@ -1,0 +1,8 @@
+/* open-manager.html is a page of its own: no ComfyUI palette, so the dark fallbacks of tokens.css apply. */
+.mb-manager-page { color-scheme: dark; margin: 0; padding: 32px; color: var(--mb-text); background: var(--mb-bg); font: 15px/1.6 system-ui, sans-serif; }
+.mb-manager-page * { box-sizing: border-box; }
+.mb-manager-page main { max-width: 650px; margin: 8vh auto; }
+.mb-manager-page h1 { font-size: 22px; }
+.mb-manager-page :is(a, button) { display: block; padding: 12px; margin: 8px 0; color: var(--mb-accent); background: var(--mb-surface); border: 1px solid var(--mb-line); border-radius: var(--mb-r-m); font: inherit; text-decoration: none; text-align: left; cursor: pointer; }
+.mb-manager-page :is(a, button):hover { border-color: var(--mb-accent); }
+.mb-manager-frame { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; }

@@ -11,20 +11,20 @@ function element(tag, className) {
 }
 
 function tagWidget(node, name) {
-  const root = element("div", "kt-tagbox");
-  const picker = element("input", "kt-tag-input");
+  const root = element("div", "mb-tagbox");
+  const picker = element("input", "mb-input");
   picker.type = "text";
   picker.placeholder = "Add a tag…";
   picker.autocomplete = "off";
   picker.spellcheck = false;
-  picker.dataset.ktTagPicker = "1";
-  const area = element("textarea", "kt-tag-area");
+  picker.dataset.mbTagPicker = "1";
+  const area = element("textarea", "mb-input mb-tag-area");
   area.placeholder = "tag, tag, …";
   area.spellcheck = false;
-  area.dataset.ktTagField = "1";
+  area.dataset.mbTagField = "1";
   root.append(picker, area);
 
-  picker.addEventListener("kt-tag", (event) => {
+  picker.addEventListener("mb-tag", (event) => {
     area.value = formatTags(`${area.value}, ${event.detail}`);
     node.setDirtyCanvas(true, true);
   });

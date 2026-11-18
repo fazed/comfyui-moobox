@@ -1,0 +1,20 @@
+.mb-compare { display: flex; flex-direction: column; gap: 8px; width: 100%; height: 100%; min-height: 0; }
+.mb-compare > .mb { height: auto; gap: 8px; padding: 8px; contain: none; }
+.mb-compare > .mb-compare-controls { flex: 0 0 auto; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 6px 8px; }
+.mb-compare > .mb-compare-view { flex: 1 1 0; }
+.mb-compare-controls .mb-input { height: 26px; }
+.mb-compare-swap { min-height: 26px; padding: 2px 10px; }
+.mb-compare-mode { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.mb-compare-info { color: var(--mb-muted); cursor: help; }
+.mb-compare-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; border-radius: var(--mb-r-s); user-select: none; }
+.mb-compare-frame { position: absolute; cursor: pointer; }
+.mb-compare-frame img, .mb-compare-frame canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; -webkit-user-drag: none; }
+.mb-compare-frame[data-mode="slider"], .mb-compare-frame[data-mode="blend"] { cursor: ew-resize; touch-action: none; }
+.mb-compare-frame[data-mode="diff"], .mb-compare-frame[data-mode="blink"] { cursor: default; }
+.mb-compare-line { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--mb-overlay-line); box-shadow: 0 0 4px var(--mb-overlay-shadow); pointer-events: none; }
+.mb-compare-tag { position: absolute; top: 6px; padding: 1px 8px; border-radius: 4px; color: var(--mb-overlay-text); background: var(--mb-overlay-bg); pointer-events: none; }
+.mb-compare-empty { position: absolute; inset: 0; min-height: 0; }
+.mb-compare-frame[data-mode="blink"] > img:nth-of-type(2), .mb-compare-frame[data-mode="blink"] > .mb-compare-tag:nth-of-type(2) { animation: mb-blink-b 1.2s step-end infinite; }
+.mb-compare-frame[data-mode="blink"] > .mb-compare-tag:nth-of-type(1) { animation: mb-blink-a 1.2s step-end infinite; }
+@keyframes mb-blink-a { 0% { visibility: visible; } 50% { visibility: hidden; } }
+@keyframes mb-blink-b { 0% { visibility: hidden; } 50% { visibility: visible; } }

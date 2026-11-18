@@ -1,0 +1,30 @@
+/* The only place with colours. ComfyUI's palette variables bridge the light and dark themes. */
+:root, .mb-popup {
+  --mb-bg: var(--component-node-background, #262729);
+  --mb-field: var(--component-node-widget-background, #313235);
+  --mb-text: var(--fg-color, #e5eaf2);
+  --mb-surface: color-mix(in srgb, var(--mb-bg) 88%, #8095ae);
+  --mb-line: var(--node-border, #55565e);
+  --mb-muted: var(--node-foreground, #9aa9bc);
+  /* ComfyUI sets color-scheme per palette; the light value keeps accent text readable on white. */
+  --mb-accent: light-dark(#1a5fa8, #80b9f8);
+  --mb-accent-ink: #0d1b2c;
+  --mb-ok: light-dark(#14633f, #72c8a0);
+  --mb-warn: #e9c46a;
+  --mb-bad: light-dark(#b42336, #ed929e);
+  --mb-track: color-mix(in srgb, var(--mb-text) 14%, transparent);
+  --mb-r-s: 6px;
+  --mb-r-m: 8px;
+  --mb-r-l: 10px;
+  --mb-shadow: 0 8px 24px #0008;
+  --mb-cat-loader: #80b9f8;
+  --mb-cat-sampler: #e9c46a;
+  --mb-cat-view: light-dark(#17635d, #71c3bd);
+  --mb-cat-monitor: light-dark(#4c3dbf, #b6aeff);
+  --mb-cat-text: #c9a0f0;
+  /* Overlays drawn on top of images keep fixed colours in both themes. */
+  --mb-overlay-line: #fff;
+  --mb-overlay-shadow: #000;
+  --mb-overlay-bg: #0009;
+  --mb-overlay-text: #fff;
+}

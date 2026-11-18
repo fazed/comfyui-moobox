@@ -96,7 +96,7 @@ test('optional manager metadata failures do not prevent native LoRA selection', 
   });
   const { widget } = extension.getCustomWidgets().MOOBOX_LORAS(node, 'loras');
   const search = find(widget.element, (el) => el.type === 'search');
-  const results = find(widget.element, (el) => el.className === 'kt-results');
+  const results = find(widget.element, (el) => el.className === 'mb-results');
   search.value = 'alpha';
   search.dispatchEvent(new Event('input'));
   await new Promise((resolve) => setTimeout(resolve, 220));
@@ -116,7 +116,7 @@ test('late search responses cannot replace results for a newer query', async () 
   });
   const { widget } = extension.getCustomWidgets().MOOBOX_LORAS(node, 'loras');
   const search = find(widget.element, (el) => el.type === 'search');
-  const results = find(widget.element, (el) => el.className === 'kt-results');
+  const results = find(widget.element, (el) => el.className === 'mb-results');
   search.value = 'old'; search.dispatchEvent(new Event('input'));
   await new Promise((resolve) => setTimeout(resolve, 220));
   search.value = 'new'; search.dispatchEvent(new Event('input'));
@@ -140,7 +140,7 @@ test('native search sends the chosen family and a family change refreshes the re
   node.widgets.push(family);
   type.prototype.onNodeCreated.call(node);
   const search = find(widget.element, (el) => el.type === 'search');
-  const results = find(widget.element, (el) => el.className === 'kt-results');
+  const results = find(widget.element, (el) => el.className === 'mb-results');
   search.value = 'style'; search.dispatchEvent(new Event('input'));
   await new Promise((resolve) => setTimeout(resolve, 220));
   assert.equal(paths.at(-1), '/moobox-lora/search?q=style');
@@ -166,7 +166,7 @@ test('LoRA Manager search uses the full MooBox search when a family is chosen', 
   const family = { name: 'family', value: 'Any' };
   node.widgets.push({ name: 'loader', value: 'LoRA Manager' }, family);
   const search = find(widget.element, (el) => el.type === 'search');
-  const results = find(widget.element, (el) => el.className === 'kt-results');
+  const results = find(widget.element, (el) => el.className === 'mb-results');
   search.value = 'concept'; search.dispatchEvent(new Event('input'));
   await new Promise((resolve) => setTimeout(resolve, 220));
   assert.equal(paths.at(-1), '/lm/loras/relative-paths?search=concept&limit=50');
@@ -197,8 +197,8 @@ test('native search appends every page in order and keeps the highlighted result
   });
   const { widget } = extension.getCustomWidgets().MOOBOX_LORAS(node, 'loras');
   const search = find(widget.element, (el) => el.type === 'search');
-  const results = find(widget.element, (el) => el.className === 'kt-results');
-  const status = find(widget.element, (el) => el.className === 'kt-status');
+  const results = find(widget.element, (el) => el.className === 'mb-results');
+  const status = find(widget.element, (el) => el.className === 'mb-status');
   search.value = 'lora'; search.dispatchEvent(new Event('input'));
   await new Promise((resolve) => setTimeout(resolve, 220));
   assert.equal(results.children.length, 50);
@@ -226,7 +226,7 @@ test('changing the query stops loading the pages of the old query', async () => 
   });
   const { widget } = extension.getCustomWidgets().MOOBOX_LORAS(node, 'loras');
   const search = find(widget.element, (el) => el.type === 'search');
-  const results = find(widget.element, (el) => el.className === 'kt-results');
+  const results = find(widget.element, (el) => el.className === 'mb-results');
   search.value = 'old'; search.dispatchEvent(new Event('input'));
   await new Promise((resolve) => setTimeout(resolve, 220));
   search.value = 'new'; search.dispatchEvent(new Event('input'));
@@ -247,7 +247,7 @@ test('LoRA Manager search without a family stays a single page of 50', async () 
   const { widget } = extension.getCustomWidgets().MOOBOX_LORAS(node, 'loras');
   node.widgets.push({ name: 'loader', value: 'LoRA Manager' });
   const search = find(widget.element, (el) => el.type === 'search');
-  const results = find(widget.element, (el) => el.className === 'kt-results');
+  const results = find(widget.element, (el) => el.className === 'mb-results');
   search.value = 'concept'; search.dispatchEvent(new Event('input'));
   await new Promise((resolve) => setTimeout(resolve, 220));
   await tick();
@@ -263,8 +263,8 @@ test('trigger factory restores groups before interaction and preserves child swi
   value.groups[0].active = true;
   value.groups[0].items[1].active = false;
   widget.value = JSON.stringify(value);
-  const group = find(widget.element, (el) => el.className === 'kt-card kt-group');
-  const words = find(group, (el) => el.className === 'kt-pills');
+  const group = find(widget.element, (el) => el.className === 'mb-card mb-group');
+  const words = find(group, (el) => el.className === 'mb-pills');
   assert.deepEqual(words.children.map((pill) => pill.dataset.active), ['true', 'false']);
   labelled(group, 'Toggle word alpha').click();
   assert.deepEqual(JSON.parse(widget.value).groups[0].items.map((item) => item.active), [false, false]);
@@ -336,8 +336,8 @@ test('absent groups can be forgotten on request', async () => {
   const { widget } = extension.getCustomWidgets().MOOBOX_TRIGGERS(node, 'selection');
   widget.value = JSON.stringify(state.reconcileWords(state.reconcileWords({ groups: [] }, 'alpha,, beta'), 'alpha'));
   assert.ok(find(widget.element, (el) => el.textContent === 'Not in source (1)'));
-  const list = find(widget.element, (el) => el.className === 'kt-list');
-  assert.deepEqual(list.children.map((box) => box.className), ['kt-card kt-group', 'kt-absent']);
+  const list = find(widget.element, (el) => el.className === 'mb-list');
+  assert.deepEqual(list.children.map((box) => box.className), ['mb-card mb-group', 'mb-absent']);
   const parked = list.children[1];
   assert.equal(labelled(parked, 'Enable group alpha'), undefined);
   assert.ok(labelled(parked, 'Toggle word beta'));
@@ -356,35 +356,35 @@ test('pill view keeps absent pills editable in their own section and can forget 
   const { widget } = extension.getCustomWidgets().MOOBOX_TRIGGERS(node, 'selection');
   const value = state.reconcileWords(state.reconcileWords({ groups: [] }, 'alpha,, beta, gamma'), 'alpha');
   widget.value = JSON.stringify({ ...value, view: 'pills' });
-  const parked = find(widget.element, (el) => el.className === 'kt-absent');
+  const parked = find(widget.element, (el) => el.className === 'mb-absent');
   labelled(parked, 'Toggle word gamma').click();
   const beta = JSON.parse(widget.value).groups[1];
   assert.deepEqual([beta.active, beta.present, beta.items.map((item) => item.active)], [true, false, [false, true]]);
   labelled(widget.element, 'Remove saved selections of groups the source no longer contains').click();
   assert.deepEqual(JSON.parse(widget.value).groups.map((group) => group.text), ['alpha']);
-  assert.equal(find(widget.element, (el) => el.className === 'kt-absent'), undefined);
+  assert.equal(find(widget.element, (el) => el.className === 'mb-absent'), undefined);
 });
 
 test('absent groups sit in a separate section after the present ones in both views', async () => {
   const { node, extension } = await harness();
   const { widget } = extension.getCustomWidgets().MOOBOX_TRIGGERS(node, 'selection');
   const value = state.reconcileWords(state.reconcileWords({ groups: [] }, 'alpha,, beta, gamma,, delta'), 'alpha,, delta');
-  const absentSection = () => find(widget.element, (el) => el.className === 'kt-absent');
+  const absentSection = () => find(widget.element, (el) => el.className === 'mb-absent');
 
   widget.value = JSON.stringify({ ...value, view: 'pills' });
-  const list = find(widget.element, (el) => el.className === 'kt-list');
-  assert.deepEqual(list.children.map((el) => el.className), ['kt-pills', 'kt-absent']);
+  const list = find(widget.element, (el) => el.className === 'mb-list');
+  assert.deepEqual(list.children.map((el) => el.className), ['mb-pills', 'mb-absent']);
   const words = (el) => el.children.map((pill) => pill.children[0].textContent);
   assert.deepEqual(words(list.children[0]), ['alpha', 'delta']);
   assert.ok(find(absentSection(), (el) => el.textContent === 'Not in source (1)'));
   assert.ok(labelled(absentSection(), 'Remove saved selections of groups the source no longer contains'));
-  assert.deepEqual(words(find(absentSection(), (el) => el.className === 'kt-pills')), ['beta', 'gamma']);
-  assert.equal(find(widget.element, (el) => el.className === 'kt-badge').textContent, '0/2 active');
+  assert.deepEqual(words(find(absentSection(), (el) => el.className === 'mb-pills')), ['beta', 'gamma']);
+  assert.equal(find(widget.element, (el) => el.className === 'mb-badge').textContent, '0/2 active');
 
   widget.value = JSON.stringify({ ...value, view: 'groups' });
-  const cards = find(widget.element, (el) => el.className === 'kt-list').children;
-  assert.deepEqual(cards.map((el) => el.className), ['kt-card kt-group', 'kt-card kt-group', 'kt-absent']);
-  const name = (el) => find(el, (child) => child.className === 'kt-name').textContent;
+  const cards = find(widget.element, (el) => el.className === 'mb-list').children;
+  assert.deepEqual(cards.map((el) => el.className), ['mb-card mb-group', 'mb-card mb-group', 'mb-absent']);
+  const name = (el) => find(el, (child) => child.className === 'mb-name').textContent;
   assert.deepEqual(cards.slice(0, 2).map(name), ['alpha', 'delta']);
   assert.equal(name(cards[2]), 'beta, gamma');
   assert.ok(find(cards[2], (el) => el.textContent === 'Not in source (1)'));
@@ -417,7 +417,7 @@ test('pill view toggles single words and keeps other words in a disabled group o
   const { node, extension } = await harness();
   const { widget } = extension.getCustomWidgets().MOOBOX_TRIGGERS(node, 'selection');
   widget.value = JSON.stringify({ ...state.reconcileWords({ groups: [] }, 'alpha, beta'), view: 'pills' });
-  assert.equal(find(widget.element, (el) => el.className?.startsWith('kt-card')), undefined);
+  assert.equal(find(widget.element, (el) => el.className?.startsWith('mb-card')), undefined);
   labelled(widget.element, 'Toggle word beta').click();
   const saved = JSON.parse(widget.value);
   assert.equal(saved.view, 'pills');
@@ -429,4 +429,11 @@ test('pill view toggles single words and keeps other words in a disabled group o
   assert.equal(JSON.parse(widget.value).groups[0].items[1].strength, 0.6);
   labelled(widget.element, 'Toggle word beta').click();
   assert.equal(JSON.parse(widget.value).groups[0].items[1].active, false);
+});
+
+test('loader and trigger widgets use mb- classes whose colours all come from tokens.css', async () => {
+  const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
+  assert.doesNotMatch(await read('../web/widgets.js'), /kt-/);
+  assert.match(await read('../web/moobox.css'), /css\/loras\.css/);
+  assert.doesNotMatch(await read('../web/css/loras.css'), /#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(|\b(white|black)\b(?!-)/i);
 });

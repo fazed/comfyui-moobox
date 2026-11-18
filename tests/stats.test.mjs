@@ -14,7 +14,7 @@ class Node {
   remove() { this.parentElement?.children.splice(this.parentElement.children.indexOf(this), 1); this.parentElement = null; }
 }
 const all = node => [node, ...node.children.flatMap(all)];
-const values = node => all(node).filter(n => n.className === "mbj-stats-value").map(n => n.textContent);
+const values = node => all(node).filter(n => n.className === "mb-stats-value").map(n => n.textContent);
 const flush = () => new Promise(resolve => queueMicrotask(() => setImmediate(resolve)));
 
 function setup() {
@@ -46,7 +46,7 @@ test("stats dock in the action bar, fetch once per tick, skip while hidden, refr
   const env = setup();
   try {
     const stats = createStatsWidget(env.api, 2000);
-    assert.equal(env.bar.children[0].className, "mbj-stats");
+    assert.equal(env.bar.children[0].className, "mb-widget mb-stats");
     await flush();
     assert.deepEqual(values(env.bar), ["40%", "25%", "—"]);
     assert.equal(env.requests.length, 1);
@@ -96,7 +96,7 @@ test("flush frees through core only with an empty queue, stays disabled meanwhil
     const stats = createStatsWidget(env.api, 0);
     await flush();
     const button = env.bar.children[0].children[1];
-    assert.equal(button.className, "mbj-stats-flush");
+    assert.equal(button.className, "mb-btn mb-stats-flush");
     assert.equal(button["aria-label"], "Flush models from RAM and VRAM");
 
     const click = async () => {

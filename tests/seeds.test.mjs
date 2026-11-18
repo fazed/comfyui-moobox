@@ -45,6 +45,13 @@ test('seeds advance only after the prompt was accepted', async () => {
   assert.deepEqual(after.map((entry) => entry.last), used);
 });
 
+test('seeds uses mb- classes whose colours all come from tokens.css', async () => {
+  const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
+  assert.doesNotMatch(await read('../web/seeds.js'), /kt-/);
+  const colour = /#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(|\b(white|black)\b(?!-)/i;
+  for (const sheet of ['../web/css/base.css', '../web/css/seeds.css']) assert.doesNotMatch(await read(sheet), colour, sheet);
+});
+
 test('after a run a seed follows its mode, and -1 stays random', () => {
   assert.equal(afterRun({ seed: -1, mode: 'increment' }, 41), -1);
   assert.equal(afterRun({ seed: 5, mode: 'increment' }, 5), 6);

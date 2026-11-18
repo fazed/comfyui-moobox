@@ -1,0 +1,10 @@
+.mb-groups { gap: 4px; padding: 8px; overflow-y: auto; contain: none; }
+.mb-groups-list { display: flex; flex-direction: column; gap: 4px; }
+.mb-groups .mb-empty { min-height: 0; padding: 10px; }
+.mb-group-path { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--mb-line); }
+.mb-group-row { display: flex; align-items: center; gap: 8px; min-height: 26px; }
+.mb-group-row > .mb-name { flex: 1; font-weight: 500; }
+.mb-group-row[data-active="false"] > .mb-name { color: var(--mb-muted); }
+.mb-group-swatch { flex: 0 0 8px; height: 14px; border-radius: 3px; }
+.mb-group-go { min-width: 26px; min-height: 26px; padding: 0 5px; color: var(--mb-muted); }
+.mb-group-go:hover { color: var(--mb-accent); }

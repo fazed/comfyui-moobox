@@ -27,14 +27,18 @@ function dismiss(event) {
 
 function openMenu(anchor, current, choose) {
   closeMenu();
-  menu = element("div", "kt-seed-menu");
-  menu.append(element("div", "kt-seed-menu-title", "After running, update the seed:"));
+  menu = element("div", "mb-popup mb-menu mb-seed-menu");
+  menu.setAttribute("role", "menu");
+  menu.append(element("div", "mb-menu-title", "After running, update the seed:"));
   for (const [mode, { icon, label, info }] of Object.entries(MODES)) {
-    const item = element("button", "kt-seed-menu-item");
+    const item = element("button", "mb-menu-item");
     item.type = "button";
-    item.dataset.active = String(mode === current);
+    item.setAttribute("role", "menuitemradio");
+    item.setAttribute("aria-checked", String(mode === current));
     item.title = info;
-    item.append(element("span", "kt-seed-menu-icon", icon), element("span", "", `${label} · ${info}`));
+    const iconSpan = element("span", "mb-seed-menu-icon");
+    iconSpan.append(glyph(icon));
+    item.append(iconSpan, element("span", "", `${label}: ${info}`));
     item.addEventListener("click", () => { closeMenu(); choose(mode); });
     menu.append(item);
   }
@@ -52,8 +56,9 @@ function element(tag, className, text) {
   return el;
 }
 
-function button(content, title, action) {
-  const el = element("button", "kt-button kt-icon");
+function button(content, title, action, variant = "ghost") {
+  const el = element("button", "mb-btn");
+  if (variant) el.dataset.variant = variant;
   el.append(content);
   el.type = "button";
   el.title = title;
@@ -70,7 +75,7 @@ function syncOutputs(node, count) {
 }
 
 function seedsWidget(node, name) {
-  const root = element("div", "kt-root kt-seeds");
+  const root = element("div", "mb mb-seeds");
   let state = [{ seed: -1, last: null }];
   let widget;
 
@@ -83,16 +88,16 @@ function seedsWidget(node, name) {
 
   const render = () => {
     root.replaceChildren();
-    const all = element("div", "kt-seed-all");
-    all.append(element("span", "kt-seed-all-label", "All seeds"),
+    const all = element("div", "mb-seed-all");
+    all.append(element("span", "mb-seed-all-label", "All seeds"),
       button(glyph("repeat"), "Random each time: set every seed to -1", () => commit(state.map((entry) => ({ ...entry, seed: -1 })))),
       button(glyph("dice"), "New fixed random: pick a new seed for every row", () => commit(state.map((entry) => ({ ...entry, seed: randomSeed() })))),
       button(glyph("history"), "Use last used seeds: restore every row that has one", () => commit(state.map((entry) => ({ ...entry, seed: entry.last ?? entry.seed })))));
     root.append(all);
     state.forEach((entry, index) => {
-      const row = element("div", "kt-seed-row");
-      const field = element("div", "kt-seed-field");
-      const input = element("input", "kt-number");
+      const row = element("div", "mb-seed-row");
+      const field = element("div", "mb-seed-field");
+      const input = element("input", "mb-input");
       input.type = "text";
       input.inputMode = "numeric";
       input.value = entry.seed;
@@ -105,18 +110,20 @@ function seedsWidget(node, name) {
       });
       const mode = entry.mode ?? "fixed";
       const random = entry.seed === -1;
-      const shuffle = element("button", "kt-seed-shuffle");
+      const shuffle = element("button", "mb-btn mb-seed-mode");
       shuffle.append(glyph(random ? "shuffle" : MODES[mode].icon));
       shuffle.type = "button";
-      shuffle.dataset.active = String(random || mode !== "fixed");
+      shuffle.dataset.variant = "ghost";
+      shuffle.setAttribute("aria-pressed", String(random || mode !== "fixed"));
+      shuffle.setAttribute("aria-haspopup", "menu");
       shuffle.title = random ? "Random each time (-1). Click to choose what happens after a run" : `${MODES[mode].label}: ${MODES[mode].info}. Click to change`;
       shuffle.setAttribute("aria-label", "Update the seed after running");
       shuffle.addEventListener("click", (event) => { event.stopPropagation(); openMenu(shuffle, mode, (next) => update(index, { mode: next })); });
       field.append(input, shuffle);
-      const [minus, plus] = [[-1, "−", "Decrease seed by 1"], [1, "+", "Increase seed by 1"]].map(([step, text, title]) => {
+      const [minus, plus] = [[-1, "minus", "Decrease seed by 1"], [1, "plus", "Increase seed by 1"]].map(([step, icon, title]) => {
         const next = stepSeed(entry.seed, step);
-        const stepper = button(text, title, () => update(index, { seed: next }));
-        stepper.classList.add("kt-seed-step");
+        const stepper = button(glyph(icon), title, () => update(index, { seed: next }), null);
+        stepper.classList.add("mb-seed-step");
         stepper.disabled = next === entry.seed;
         return stepper;
       });
@@ -127,12 +134,13 @@ function seedsWidget(node, name) {
       last.disabled = entry.last == null;
       const remove = button(glyph("trash"), `Remove seed ${index + 1}`, () => commit(state.filter((_, i) => i !== index)));
       remove.disabled = state.length === 1;
-      const group = element("div", "kt-seed-group");
+      const group = element("div", "mb-joined");
       group.append(minus, field, plus);
       row.append(group, each, fresh, last, remove);
       root.append(row);
     });
-    const add = button("+ Add seed", "Add a seed and output", () => commit([...state, { seed: -1, last: null }]));
+    const add = button(glyph("plus"), "Add a seed and output", () => commit([...state, { seed: -1, last: null }]));
+    add.append("Add seed");
     add.disabled = state.length >= MAX_SEEDS;
     root.append(add);
   };

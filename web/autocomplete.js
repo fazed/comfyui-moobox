@@ -68,9 +68,9 @@ export function release(el) {
 
 function render() {
   popup.replaceChildren(...hits.map((hit, index) => {
-    const row = element("div", index === selected ? "kt-tag-row kt-tag-selected" : "kt-tag-row");
-    row.append(element("span", "kt-tag-name", hit.alias ? `${hit.alias} → ${hit.tag}` : hit.tag));
-    if (hit.count) row.append(element("span", "kt-tag-count", hit.count.toLocaleString("en")));
+    const row = element("div", index === selected ? "mb-menu-item mb-tag-row mb-selected" : "mb-menu-item mb-tag-row");
+    row.append(element("span", "mb-tag-name", hit.alias ? `${hit.alias} → ${hit.tag}` : hit.tag));
+    if (hit.count) row.append(element("span", "mb-tag-count", hit.count.toLocaleString("en")));
     row.addEventListener("mousedown", (event) => { event.preventDefault(); accept(index); });
     return row;
   }));
@@ -81,13 +81,13 @@ function insertOptions(target) {
   return {
     spaces: setting("ReplaceUnderscores"),
     escape: setting("EscapeBrackets"),
-    comma: !target.dataset.ktTagPicker && setting("AppendComma"),
+    comma: !target.dataset.mbTagPicker && setting("AppendComma"),
   };
 }
 
 function addPicked(picker, text) {
   picker.value = "";
-  picker.dispatchEvent(new CustomEvent("kt-tag", { detail: text.trim() }));
+  picker.dispatchEvent(new CustomEvent("mb-tag", { detail: text.trim() }));
 }
 
 function accept(index) {
@@ -96,7 +96,7 @@ function accept(index) {
   const textarea = field;
   const after = textarea.value.slice(range.end);
   const text = completion(after, hit.tag, insertOptions(textarea));
-  if (textarea.dataset.ktTagPicker) addPicked(textarea, text);
+  if (textarea.dataset.mbTagPicker) addPicked(textarea, text);
   else {
     textarea.setRangeText(text, range.start, range.end, "end");
     textarea.dispatchEvent(new Event("input", { bubbles: true }));
@@ -114,7 +114,7 @@ function update(textarea) {
   range = { start: found.start, end: caret };
   selected = 0;
   if (!popup) {
-    popup = element("div", "kt-tag-popup");
+    popup = element("div", "mb-popup mb-menu mb-tag-popup");
     document.body.append(popup);
   }
   render();
@@ -125,8 +125,8 @@ function update(textarea) {
 }
 
 function usable(target) {
-  const picker = target instanceof HTMLInputElement && target.dataset.ktTagPicker;
-  const text = target instanceof HTMLTextAreaElement && !target.readOnly && !target.dataset.ktNoAc && target.placeholder !== NATURAL_TEXT && !target.closest(`[data-widget-name="${NATURAL_TEXT}"]`) && (target.dataset.ktTagField || target.closest(TEXT_FIELDS));
+  const picker = target instanceof HTMLInputElement && target.dataset.mbTagPicker;
+  const text = target instanceof HTMLTextAreaElement && !target.readOnly && !target.dataset.mbNoAc && target.placeholder !== NATURAL_TEXT && !target.closest(`[data-widget-name="${NATURAL_TEXT}"]`) && (target.dataset.mbTagField || target.closest(TEXT_FIELDS));
   return (picker || text) && setting("Enabled");
 }
 
@@ -139,7 +139,7 @@ document.addEventListener("input", (event) => {
 
 document.addEventListener("keydown", (event) => {
   const target = event.target;
-  if (!popup && event.key === "Enter" && target.dataset?.ktTagPicker && target.value.trim() && !event.isComposing) {
+  if (!popup && event.key === "Enter" && target.dataset?.mbTagPicker && target.value.trim() && !event.isComposing) {
     event.preventDefault();
     addPicked(target, completion("", target.value.trim(), { ...insertOptions(target), escape: false }));
     return;
@@ -160,11 +160,11 @@ document.addEventListener("pointerdown", (event) => { if (field && event.target 
 document.addEventListener("wheel", (event) => { if (popup && !popup.contains(event.target)) close(); }, { capture: true, passive: true });
 
 function listEditor() {
-  const root = element("div", "kt-tags-editor");
-  const area = element("textarea", "kt-tags-text");
-  area.dataset.ktNoAc = "1";
+  const root = element("div", "mb-tags-editor");
+  const area = element("textarea", "mb-input mb-tags-text");
+  area.dataset.mbNoAc = "1";
   area.spellcheck = false;
-  const status = element("div", "kt-tags-status");
+  const status = element("div", "mb-tags-status");
   let large = false;
   const show = async () => {
     const text = await loadTags();
@@ -174,7 +174,7 @@ function listEditor() {
     status.textContent = `${entries.length.toLocaleString("en")} tags loaded`;
   };
   const run = (label, action) => {
-    const el = element("button", "kt-tags-button", label);
+    const el = element("button", "mb-btn", label);
     el.type = "button";
     el.addEventListener("click", async () => {
       status.textContent = "Working…";
@@ -187,7 +187,7 @@ function listEditor() {
     if (!response.ok) throw new Error(`${response.status} ${await response.text()}`);
     await show();
   };
-  const buttons = element("div", "kt-tags-buttons");
+  const buttons = element("div", "mb-tags-buttons");
   buttons.append(
     run("Save list", () => {
       if (large && !area.value.trim()) throw new Error("Paste a list first; saving now would empty the saved list.");

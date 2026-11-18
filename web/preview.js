@@ -19,14 +19,14 @@ function imageUrl(file) {
 function previewWidget(node) {
   let files = [];
   let index = 0;
-  const root = element("div", "kt-root kt-images");
-  const bar = element("div", "kt-images-bar");
-  const counter = element("span", "kt-images-counter");
-  const stage = element("div", "kt-images-stage");
+  const root = element("div", "mb mb-images");
+  const bar = element("div", "mb-images-bar");
+  const counter = element("span", "mb-badge mb-images-counter");
+  const stage = element("div", "mb-images-stage");
   const img = element("img");
-  const empty = element("div", "kt-images-empty", "Run the workflow to preview the connected images.");
+  const empty = element("div", "mb-empty mb-images-empty", "Run the workflow to preview the connected images.");
   const button = (icon, title, delta) => {
-    const el = element("button", "kt-button");
+    const el = element("button", "mb-btn");
     el.type = "button";
     el.title = title;
     el.setAttribute("aria-label", title);

@@ -41,17 +41,17 @@ function loadPosition(storage) {
 
 // Docks in the native action bar. Dragging the grip floats it; dropping it on the bar or double-clicking the grip docks it again.
 export function createWidget(store, openPanel, storage = globalThis.localStorage) {
-  const root = element("div", "mbj-widget");
-  const grip = element("span", "mbj-widget-grip", "⋮⋮");
+  const root = element("div", "mb-widget");
+  const grip = element("span", "mb-widget-grip", "⋮⋮");
   grip.title = "Drag to move · drop on the bar or double-click to dock";
-  const meter = element("button", "mbj-widget-meter");
+  const meter = element("button", "mb-widget-meter");
   meter.type = "button";
   meter.onclick = openPanel;
-  const fill = element("span", "mbj-widget-fill");
-  const label = element("span", "mbj-widget-label");
+  const fill = element("span", "mb-widget-fill");
+  const label = element("span", "mb-widget-label");
   meter.append(fill, label);
-  const local = element("span", "mbj-widget-count mbj-widget-local");
-  const external = element("span", "mbj-widget-count mbj-widget-external-count");
+  const local = element("span", "mb-badge mb-widget-count");
+  const external = element("span", "mb-badge mb-widget-count mb-widget-external-count");
   root.append(grip, meter, local, external);
   document.body.append(root);
 
@@ -59,7 +59,7 @@ export function createWidget(store, openPanel, storage = globalThis.localStorage
 
   function place() {
     const bar = document.querySelector(".actionbar-container");
-    root.classList.toggle("mbj-widget-floating", Boolean(position) || !bar);
+    root.classList.toggle("mb-widget-floating", Boolean(position) || !bar);
     if (position) {
       if (root.parentElement !== document.body) document.body.append(root);
       root.style.right = "auto";
@@ -76,14 +76,14 @@ export function createWidget(store, openPanel, storage = globalThis.localStorage
     const state = widgetState(store.snapshot?.jobs || [], store.tag);
     label.textContent = state.label;
     fill.style.width = state.percent === null ? "0" : `${state.percent}%`;
-    root.classList.toggle("mbj-widget-external", !state.idle && !state.mine);
-    root.classList.toggle("mbj-widget-idle", state.idle);
+    root.classList.toggle("mb-widget-external", !state.idle && !state.mine);
+    root.classList.toggle("mb-widget-idle", state.idle);
     meter.title = `${state.label} · click for details`;
     for (const [el, chip] of [[local, state.local], [external, state.external]]) {
       el.hidden = chip.count === 0;
       el.textContent = String(chip.count);
       el.title = chip.title;
-      el.classList.toggle("mbj-widget-waiting", chip.waiting);
+      el.classList.toggle("mb-widget-waiting", chip.waiting);
     }
     place();
   }
@@ -100,13 +100,13 @@ export function createWidget(store, openPanel, storage = globalThis.localStorage
     const offset = { x: event.clientX - box.left, y: event.clientY - box.top };
     const move = pointer => {
       position = { x: Math.max(0, pointer.clientX - offset.x), y: Math.max(0, pointer.clientY - offset.y) };
-      root.classList.toggle("mbj-widget-docking", overDock(pointer.clientX, pointer.clientY));
+      root.classList.toggle("mb-widget-docking", overDock(pointer.clientX, pointer.clientY));
       place();
     };
     const end = pointer => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", end);
-      root.classList.remove("mbj-widget-docking");
+      root.classList.remove("mb-widget-docking");
       if (!position) return;
       if (overDock(pointer.clientX, pointer.clientY)) dock();
       else storage?.setItem(POSITION_KEY, JSON.stringify(position));

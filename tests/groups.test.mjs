@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { groupIsOn, nodesInside, nodesToSwitch, parseColors, pickGroups } from '../web/groupstate.js';
 
@@ -60,4 +61,11 @@ test('finds nodes by centre from pos and size, ignoring boundingRect', () => {
   assert.equal(nodesInside([-40, -110, 1540, 954], nodes, 30).length, 1);
   assert.equal(nodesInside([-600, -110, 600, 954], nodes, 30).length, 1);
   assert.equal(nodesInside([1460, -110, 1540, 954], nodes, 30).length, 1);
+});
+
+test('groups toggle uses mb- classes whose colours all come from tokens.css', async () => {
+  const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
+  assert.doesNotMatch(await read('../web/groups.js'), /kt-/);
+  assert.match(await read('../web/moobox.css'), /css\/groups\.css/);
+  assert.doesNotMatch(await read('../web/css/groups.css'), /#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(|\b(white|black)\b(?!-)/i);
 });

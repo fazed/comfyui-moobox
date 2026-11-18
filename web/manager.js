@@ -34,7 +34,7 @@ export function clickDetailCard(doc) {
 
 function showLibraryDetail(url) {
   const frame = document.createElement("iframe");
-  frame.className = "kt-manager-frame";
+  frame.className = "mb-manager-frame";
   frame.title = "LoRA Manager";
   frame.src = url;
   document.body.className = "";

@@ -18,29 +18,29 @@ export function statsState(stats) {
 // Docks in the native action bar, which ComfyUI may build late, so every refresh docks it again when needed.
 // The update timer is the only one in the pack and skips its request while the tab is hidden.
 export function createStatsWidget(api, interval) {
-  const root = element("div", "mbj-stats");
-  const metersButton = element("button", "mbj-stats-meters");
+  const root = element("div", "mb-widget mb-stats");
+  const metersButton = element("button", "mb-stats-meters");
   metersButton.type = "button";
-  const flushButton = element("button", "mbj-stats-flush");
+  const flushButton = element("button", "mb-btn mb-stats-flush");
   flushButton.type = "button";
   flushButton.title = FLUSH_TITLE;
   flushButton.setAttribute("aria-label", FLUSH_TITLE);
   flushButton.append(glyph("eject"));
   root.append(metersButton, flushButton);
   const meters = statsState(null).map(({ name }) => {
-    const el = element("span", "mbj-stats-meter");
-    const value = element("span", "mbj-stats-value");
-    const fill = element("span", "mbj-stats-fill");
-    const track = element("span", "mbj-stats-bar");
+    const el = element("span", "mb-stats-meter");
+    const value = element("span", "mb-stats-value");
+    const fill = element("span", "mb-stats-fill");
+    const track = element("span", "mb-stats-bar");
     track.append(fill);
-    el.append(element("span", "mbj-stats-name", name), value, track);
+    el.append(element("span", "mb-label mb-stats-name", name), value, track);
     metersButton.append(el);
     return { el, value, fill };
   });
 
   function place() {
     const parent = document.querySelector(".actionbar-container") || document.body;
-    root.classList.toggle("mbj-stats-floating", parent === document.body);
+    root.classList.toggle("mb-widget-floating", parent === document.body);
     if (root.parentElement !== parent) parent.prepend(root);
   }
 

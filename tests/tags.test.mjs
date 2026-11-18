@@ -39,3 +39,11 @@ test('formats the accepted tag', () => {
   assert.equal(completion('', 'score_9', on), 'score_9, ');
   assert.equal(completion('', 'long_hair', { spaces: false, escape: false, comma: false }), 'long_hair');
 });
+
+test('tag autocomplete and tag box use mb- classes whose colours all come from tokens.css', async () => {
+  const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
+  for (const file of ['../web/autocomplete.js', '../web/tagprompt.js']) assert.doesNotMatch(await read(file), /kt-|dataset\.kt/, file);
+  assert.match(await read('../web/autocomplete.js'), /"mb-popup mb-menu mb-tag-popup"/);
+  assert.match(await read('../web/moobox.css'), /css\/tags\.css/);
+  assert.doesNotMatch(await read('../web/css/tags.css'), /#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(|\b(white|black)\b(?!-)/i);
+});
