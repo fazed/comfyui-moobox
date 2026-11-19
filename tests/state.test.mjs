@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { activeWords, addLora, reconcileWords, splitWords } from '../web/state.js';
+import { activeLoraNames, activeWords, addLora, mergeLoraCode, reconcileWords, sameLora, splitWords } from '../web/state.js';
 
 test('splits commas while preserving weighted and escaped parentheses', () => {
   assert.deepEqual(splitWords('alpha, (beta, gamma:0.8), cat \\(ears\\)'), ['alpha', '(beta, gamma:0.8)', 'cat \\(ears\\)']);
@@ -62,6 +62,51 @@ test('groups match despite trailing commas and drop saved duplicates', () => {
     ['delta', false, true],
   ]);
   assert.equal(result.groups[0].strength, 0.7);
+});
+
+test('sent lora tags parse names with folders and omitted or separate strengths', () => {
+  const result = mergeLoraCode([], '<lora:style/ink:0.8:0.5> <lora:glow:-.5> <lora:plain>', 'append');
+  assert.deepEqual(result, [
+    { name: 'style/ink', words: [], strength: 0.8, clipStrength: 0.5, linked: false, active: true },
+    { name: 'glow', words: [], strength: -0.5, clipStrength: -0.5, linked: true, active: true },
+    { name: 'plain', words: [], strength: 1, clipStrength: 1, linked: true, active: true },
+  ]);
+});
+
+test('sent names match saved file names without extension and by trailing folders', () => {
+  assert.ok(sameLora('chars\\style\\ink.safetensors', 'ink'));
+  assert.ok(sameLora('chars/style/ink.safetensors', 'style/ink'));
+  assert.ok(!sameLora('chars/pink.safetensors', 'ink'));
+  assert.ok(!sameLora('chars/ink.safetensors', 'style/ink'));
+});
+
+test('append switches a saved LoRA on with the sent strength instead of adding it twice', () => {
+  const entries = [
+    { name: 'a/ink.safetensors', strength: 0.3, clipStrength: 0.3, linked: true, active: false, words: ['inked'] },
+    { name: 'b.safetensors', strength: 1, clipStrength: 1, linked: true, active: true, words: [] },
+  ];
+  const result = mergeLoraCode(entries, '<lora:ink:0.7> <lora:new:1> <lora:new:0.4>', 'append');
+  assert.deepEqual(result.map((entry) => entry.name), ['a/ink.safetensors', 'b.safetensors', 'new']);
+  assert.deepEqual(result[0], { name: 'a/ink.safetensors', strength: 0.7, clipStrength: 0.7, linked: true, active: true, words: ['inked'] });
+  assert.equal(result[2].strength, 0.4);
+  assert.equal(entries[0].active, false);
+});
+
+test('replace keeps only sent LoRAs in sent order and reuses their saved entries', () => {
+  const entries = [
+    { name: 'a/ink.safetensors', strength: 0.3, clipStrength: 0.3, linked: true, active: false, words: ['inked'] },
+    { name: 'b.safetensors', strength: 1, clipStrength: 1, linked: true, active: true, words: [] },
+  ];
+  const result = mergeLoraCode(entries, '<lora:new:0.5> <lora:a/ink:0.9>', 'replace');
+  assert.deepEqual(result.map((entry) => [entry.name, entry.active, entry.strength]), [['new', true, 0.5], ['a/ink.safetensors', true, 0.9]]);
+  assert.deepEqual(result[1].words, ['inked']);
+  assert.deepEqual(mergeLoraCode(entries, '', 'replace'), []);
+  assert.equal(mergeLoraCode(entries, 'no tags', 'append').length, 2);
+});
+
+test('active LoRA names list stored names of enabled entries only', () => {
+  assert.deepEqual(activeLoraNames([{ name: 'a\\one.safetensors', active: true }, { name: 'two', active: false }, { name: 'three' }]), ['a\\one.safetensors', 'three']);
+  assert.deepEqual(activeLoraNames([]), []);
 });
 
 test('only active entries and active node modes produce live trigger previews', () => {

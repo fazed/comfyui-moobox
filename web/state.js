@@ -21,7 +21,34 @@ export function addLora(entries, entry) {
   return entries.some((saved) => saved.name === entry.name) ? entries : [...entries, entry];
 }
 
-const groupKey = (text) => text.replace(/^[\s,]+|[\s,]+$/g, "");
+const NUMBER = String.raw`[-+]?(?:\d+(?:\.\d*)?|\.\d+)`;
+const LORA_TAG = new RegExp(`<lora:([^>]+?)(?::(${NUMBER}))?(?::(${NUMBER}))?>`, "gi");
+const loraPath = (name) => name.replaceAll("\\", "/").replace(/\.(safetensors|ckpt|pt|bin)$/i, "");
+
+// LoRA Manager sends file names without extension, with folders only when the name alone is ambiguous.
+export function sameLora(name, sent) {
+  const path = loraPath(name), wanted = loraPath(sent);
+  return path === wanted || path.endsWith(`/${wanted}`);
+}
+
+export function mergeLoraCode(entries, code, mode) {
+  const result = mode === "replace" ? [] : [...entries];
+  for (const [, sent, model, clip] of code.matchAll(LORA_TAG)) {
+    const strength = model === undefined ? 1 : Number(model);
+    const clipStrength = clip === undefined ? strength : Number(clip);
+    const patch = { strength, clipStrength, linked: strength === clipStrength, active: true };
+    const index = result.findIndex((entry) => sameLora(entry.name, sent));
+    if (index >= 0) result[index] = { ...result[index], ...patch };
+    else result.push({ name: sent, words: [], ...entries.find((entry) => sameLora(entry.name, sent)), ...patch });
+  }
+  return result;
+}
+
+export function activeLoraNames(entries) {
+  return entries.filter((entry) => entry.active !== false).map((entry) => entry.name);
+}
+
+const groupKey =(text) => text.replace(/^[\s,]+|[\s,]+$/g, "");
 
 export function reconcileWords(state, source, defaultActive = false) {
   const groups = structuredClone(state.groups || []).map((group) => ({ ...group, present: false }));

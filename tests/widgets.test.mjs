@@ -30,17 +30,27 @@ function find(root, predicate) {
 }
 const labelled = (root, name) => find(root, (el) => el.attributes['aria-label'] === name);
 
-async function harness(fetchApi) {
+async function harness(fetchApi, dynamicModules = {}, console = globalThis.console) {
   let extension;
   const document = {
     head: new Element(),
     createElement: () => { const el = new Element(); el.document = document; return el; },
   };
-  const context = vm.createContext({ document, URL, AbortController, Event, structuredClone, setTimeout, clearTimeout });
+  const context = vm.createContext({ document, URL, AbortController, Event, structuredClone, setTimeout, clearTimeout, console });
+  const synthetic = (exports) => new vm.SyntheticModule(Object.keys(exports), function () {
+    for (const [name, value] of Object.entries(exports)) this.setExport(name, value);
+  }, { context });
   const source = await readFile(new URL('../web/widgets.js', import.meta.url), 'utf8');
   const module = new vm.SourceTextModule(source, {
     context,
     initializeImportMeta: (meta) => { meta.url = new URL('../web/widgets.js', import.meta.url).href; },
+    importModuleDynamically: async (specifier) => {
+      if (!dynamicModules[specifier]) throw new Error(`Cannot find module ${specifier}`);
+      const dynamic = synthetic(dynamicModules[specifier]);
+      await dynamic.link(() => {});
+      await dynamic.evaluate();
+      return dynamic;
+    },
   });
   const mocks = {
     '../../scripts/app.js': { app: { registerExtension: (value) => { extension = value; } } },
@@ -49,12 +59,7 @@ async function harness(fetchApi) {
     './state.js': state,
     './styles.js': {},
   };
-  await module.link((specifier) => {
-    const exports = mocks[specifier];
-    return new vm.SyntheticModule(Object.keys(exports), function () {
-      for (const [name, value] of Object.entries(exports)) this.setExport(name, value);
-    }, { context });
-  });
+  await module.link((specifier) => synthetic(mocks[specifier]));
   await module.evaluate();
   const node = {
     mode: 0,
@@ -410,6 +415,48 @@ test('loader re-renders only rewrite connected trigger nodes when the words chan
   enable.checked = false;
   enable.dispatchEvent(new Event('change'));
   assert.equal(writes, before + 1);
+  widget.onRemove();
+});
+
+test('LoRA Manager sends add LoRAs at once and then complete their file name and trigger words', async () => {
+  let adapter;
+  const notified = [];
+  const lmApi = {
+    LORA_NODE_ADAPTER_API_VERSION: 1,
+    registerLoraNodeAdapter: (value) => { adapter = value; },
+    notifyLoraNodeChanged: (node) => notified.push(node),
+  };
+  const { node, extension } = await harness(async (path) => {
+    if (path.includes('/search?q=ink')) return { ok: true, json: async () => ({ names: ['pink.safetensors', 'style\\ink.safetensors'], total: 2 }) };
+    if (path.includes('/words?name=style%5Cink.safetensors')) return { ok: true, json: async () => ({ words: ['inked'] }) };
+    throw new Error(`unexpected ${path}`);
+  }, { '/extensions/comfyui-lora-manager/lora_node_adapters.js': lmApi });
+  await extension.setup();
+  assert.equal(adapter.id, 'moobox');
+  assert.deepEqual([...adapter.nodeClasses], ['MooBoxLoraLoader']);
+  const { widget } = extension.getCustomWidgets().MOOBOX_LORAS(node, 'loras');
+  widget.value = JSON.stringify([{ name: 'old.safetensors', strength: 1, clipStrength: 1, linked: true, active: true, words: [] }]);
+  adapter.applyLoraCode({ node, loraCode: '<lora:style/ink:0.6>', mode: 'append' });
+  assert.deepEqual(JSON.parse(widget.value).map((entry) => entry.name), ['old.safetensors', 'style/ink']);
+  assert.deepEqual([...adapter.getActiveLoraNames(node)], ['old.safetensors', 'style/ink']);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(JSON.parse(widget.value)[1], { name: 'style\\ink.safetensors', words: ['inked'], strength: 0.6, clipStrength: 0.6, linked: true, active: true });
+  assert.equal(notified.at(-1), node);
+  adapter.applyLoraCode({ node, loraCode: '<lora:ink:0.9>', mode: 'replace' });
+  assert.deepEqual(JSON.parse(widget.value), [{ name: 'style\\ink.safetensors', words: ['inked'], strength: 0.9, clipStrength: 0.9, linked: true, active: true }]);
+  assert.deepEqual([...adapter.getActiveLoraNames({ widgets: [] })], []);
+  widget.onRemove();
+});
+
+test('the loader keeps working when LoRA Manager is not installed', async () => {
+  const warnings = [];
+  const { node, extension } = await harness(undefined, {}, { warn: (...args) => warnings.push(args) });
+  await extension.setup();
+  assert.equal(warnings.length, 1);
+  const { widget } = extension.getCustomWidgets().MOOBOX_LORAS(node, 'loras');
+  widget.value = JSON.stringify([{ name: 'alpha', active: true, strength: 1, clipStrength: 1, words: [] }]);
+  labelled(widget.element, 'Remove alpha').click();
+  assert.deepEqual(JSON.parse(widget.value), []);
   widget.onRemove();
 });
 

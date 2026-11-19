@@ -153,6 +153,9 @@ its extra model folders and special model support. Only that optional link requi
 LoRA Manager; changes to that node or its local API may later require an update of the link.
 The browser link uses LoRA Manager's existing model navigation in the new tab; filters
 in your ComfyUI tab are not changed.
+When LoRA Manager is installed, its **Send to ComfyUI** button can target the MooBox loader
+through LoRA Manager's adapter API (append or replace; a LoRA already in the list is switched
+on with the sent strength), and connected TriggerWord Toggle nodes follow the active LoRAs.
 
 Trigger words are stored in the workflow when added. With the default loader, the
 safetensors metadata is read first, then LoRA Manager's local metadata API if available.

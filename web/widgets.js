@@ -1,12 +1,14 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { glyph } from "./icons.js";
-import { activeWords, addLora, reconcileWords, splitWords } from "./state.js";
+import { activeLoraNames, activeWords, addLora, mergeLoraCode, reconcileWords, sameLora, splitWords } from "./state.js";
 import "./styles.js";
 
 const LOADER = "MooBoxLoraLoader";
 const TRIGGERS = "MooBoxTriggerWords";
 const MANAGER_NODE = "Lora Loader (LoraManager)";
+// LoRA Manager's adapter API, set once it registered the loader as a Send to ComfyUI target.
+let loraManager = null;
 
 function element(tag, className, text) {
   const el = document.createElement(tag);
@@ -169,6 +171,23 @@ function hidePreview() {
   if (previewBox) previewBox.style.display = "none";
 }
 
+async function loraWords(node, name) {
+  if (node.widgets?.find((item) => item.name === "loader")?.value === "LoRA Manager") {
+    const data = await json(`/lm/loras/get-trigger-words?name=${encodeURIComponent(stem(name))}`);
+    if (data.success === false) throw new Error("LoRA Manager could not read this LoRA.");
+    return data.trigger_words || [];
+  }
+  const data = await json(`/moobox-lora/words?name=${encodeURIComponent(name)}`);
+  // Metadata is optional; the loader and saved selections do not depend on LoRA Manager.
+  if (data.words.length) return data.words;
+  try {
+    const response = await api.fetchApi(`/lm/loras/get-trigger-words?name=${encodeURIComponent(stem(name))}`);
+    return response.ok ? (await response.json()).trigger_words || [] : [];
+  } catch {
+    return [];
+  }
+}
+
 function loaderWidget(node, name) {
   const root = element("div", "mb mb-loras");
   const searchArea = element("div", "mb-search-area");
@@ -191,7 +210,7 @@ function loaderWidget(node, name) {
   listPanel.append(listHeading, list);
   root.append(searchPanel, listPanel);
   let timer, controller, disposed = false, selecting = false;
-  let widget, synced;
+  let widget, synced, notified = "";
   let selected = 0;
   let dragFrom = -1;
   const expanded = new Set();
@@ -200,26 +219,8 @@ function loaderWidget(node, name) {
     if (selecting) return;
     selecting = true;
     status.textContent = "Adding LoRA…";
-    const manager = node.widgets?.find((item) => item.name === "loader")?.value === "LoRA Manager";
     try {
-      let words;
-      if (manager) {
-        const data = await json(`/lm/loras/get-trigger-words?name=${encodeURIComponent(stem(name))}`);
-        if (data.success === false) throw new Error("LoRA Manager could not read this LoRA.");
-        words = data.trigger_words || [];
-      } else {
-        const data = await json(`/moobox-lora/words?name=${encodeURIComponent(name)}`);
-        words = data.words;
-        // Metadata is optional; the loader and saved selections do not depend on LoRA Manager.
-        if (!words.length) {
-          try {
-            const response = await api.fetchApi(`/lm/loras/get-trigger-words?name=${encodeURIComponent(stem(name))}`);
-            if (response.ok) words = (await response.json()).trigger_words || [];
-          } catch {
-            words = [];
-          }
-        }
-      }
+      const words = await loraWords(node, name);
       if (disposed) return;
       const entry = { name, strength: 1, clipStrength: 1, linked: true, active: true, words };
       change(node, widget, addLora(JSON.parse(widget.value), entry));
@@ -353,6 +354,9 @@ function loaderWidget(node, name) {
     const words = activeWords(entries, node.mode);
     if (words !== synced) syncConnected(node, words);
     synced = words;
+    const names = activeLoraNames(entries).join("\n");
+    if (names !== notified) loraManager?.notifyLoraNodeChanged(node);
+    notified = names;
   };
   const result = makeWidget(node, name, root, [], render);
   widget = result.widget;
@@ -426,6 +430,21 @@ function loaderWidget(node, name) {
   });
   widget.onRemove = () => { disposed = true; clearTimeout(timer); controller?.abort(); hidePreview(); };
   widget.refreshSearch = () => { clearTimeout(timer); runSearch(); };
+  // Sent LoRAs are added at once under LoRA Manager's name; this swaps in ComfyUI's file name and reads their trigger words.
+  widget.completeSent = async (sentNames) => {
+    for (const sent of sentNames) {
+      let name = sent, words = [];
+      try {
+        const data = await json(`/moobox-lora/search?q=${encodeURIComponent(sent.split("/").pop())}`);
+        name = data.names.find((item) => sameLora(item, sent)) ?? sent;
+        words = await loraWords(node, name);
+      } catch (error) {
+        if (!disposed) status.textContent = `Could not complete ${sent}: ${error.message}`;
+      }
+      if (disposed) return;
+      change(node, widget, JSON.parse(widget.value).map((entry) => entry.name === sent ? { ...entry, name, words } : entry));
+    }
+  };
   return result;
 }
 
@@ -545,6 +564,32 @@ app.registerExtension({
   name: "MooBox.LoRAToolkit",
   getCustomWidgets() {
     return { MOOBOX_LORAS: loaderWidget, MOOBOX_TRIGGERS: triggerWidget };
+  },
+  async setup() {
+    try {
+      // ComfyUI serves the module under LoRA Manager's folder name: lower case from the registry, mixed case from a git clone.
+      const manager = await import("/extensions/comfyui-lora-manager/lora_node_adapters.js")
+        .catch(() => import("/extensions/ComfyUI-Lora-Manager/lora_node_adapters.js"));
+      if (manager.LORA_NODE_ADAPTER_API_VERSION !== 1) return;
+      manager.registerLoraNodeAdapter({
+        id: "moobox",
+        apiVersion: 1,
+        nodeClasses: [LOADER],
+        applyLoraCode({ node, loraCode, mode }) {
+          const widget = node.widgets.find((item) => item.name === "loras");
+          const before = JSON.parse(widget.value);
+          const after = mergeLoraCode(before, loraCode, mode);
+          change(node, widget, after);
+          widget.completeSent(after.filter((entry) => !before.some((saved) => saved.name === entry.name)).map((entry) => entry.name));
+        },
+        getActiveLoraNames(node) {
+          return activeLoraNames(JSON.parse(node.widgets?.find((item) => item.name === "loras")?.value ?? "[]"));
+        },
+      });
+      loraManager = manager;
+    } catch (error) {
+      console.warn("MooBox: LoRA Manager's Send to ComfyUI is unavailable for the MooBox loader.", error);
+    }
   },
   beforeRegisterNodeDef(type, data) {
     if (data.name !== LOADER && data.name !== TRIGGERS) return;
