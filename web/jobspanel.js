@@ -47,6 +47,15 @@ export function nodeName(job, id) {
   return job.node_labels?.[id] || job.node_types?.[id] || "Active node";
 }
 
+// Step progress of the active node for the compact bars; null when it reports no steps.
+export function subProgress(job) {
+  const primary = primaryNode(job);
+  if (!primary) return null;
+  const [id, node] = primary;
+  const percent = node.max > 1 ? progress(node.value, node.max) : null;
+  return percent === null ? null : { percent, label: `${nodeName(job, id)} · ${node.value} / ${node.max} steps` };
+}
+
 // The bar shows one job: a running local build first, otherwise a running external job.
 export function barJob(jobs, tag) {
   const running = jobs.filter(job => job.status === "running");
@@ -257,13 +266,15 @@ export const BAR_MODES = ["Top of window", "On Jobs icon", "Both"];
 function progressBar(tag, className, parent, openPanel) {
   const el = element(tag, className);
   const fill = element("span", "mb-jobs-bar-fill");
-  el.append(fill);
+  const sub = element("span", "mb-jobs-bar-sub");
+  sub.hidden = true;
+  el.append(fill, sub);
   if (openPanel) {
     el.type = "button";
     el.onclick = openPanel;
   }
   parent.append(el);
-  return { el, fill };
+  return { el, fill, sub };
 }
 
 // The top line and the line on the Jobs sidebar icon show the same job; the mode picks which exist.
@@ -282,6 +293,7 @@ export function createBars(parent, store, openPanel, getMode) {
     const job = barJob(store.snapshot?.jobs || [], store.tag);
     const overall = job && overallProgress(job);
     const primary = job && primaryNode(job);
+    const step = job && subProgress(job);
     const mine = job && isLocal(job, store.tag);
     const title = job && [mine ? "Local build" : "External job", overall === null ? null : `${Math.floor(overall)}%`,
       primary ? nodeName(job, primary[0]) : null, "click for details"].filter(Boolean).join(" · ");
@@ -292,6 +304,11 @@ export function createBars(parent, store, openPanel, getMode) {
       bar.el.classList.toggle("mb-jobs-bar-unknown", overall === null);
       bar.fill.style.width = overall === null ? "" : `${overall}%`;
       bar.el.title = title;
+      bar.sub.hidden = !step;
+      if (!step) continue;
+      bar.sub.style.width = `${step.percent}%`;
+      bar.sub.title = step.label;
+      bar.sub.setAttribute("aria-label", step.label);
     }
     placeTabBar();
   }

@@ -1,4 +1,4 @@
-import { barJob, element, isLocal, nodeName, overallProgress, primaryNode } from "./jobspanel.js";
+import { barJob, element, isLocal, nodeName, overallProgress, primaryNode, subProgress } from "./jobspanel.js";
 
 const POSITION_KEY = "moobox.jobs.widget";
 const MARGIN = 8;
@@ -25,6 +25,7 @@ export function widgetState(jobs, tag) {
   return {
     idle: !job,
     percent,
+    step: job ? subProgress(job) : null,
     mine,
     label: !job ? "Idle" : [percent === null ? null : `${Math.floor(percent)}%`, node ? nodeName(job, node[0]) : "Running"].filter(Boolean).join(" · "),
     local: chip("Local builds", active.filter(item => isLocal(item, tag)), Boolean(job) && !mine),
@@ -49,7 +50,8 @@ export function createWidget(store, openPanel, storage = globalThis.localStorage
   meter.onclick = openPanel;
   const fill = element("span", "mb-widget-fill");
   const label = element("span", "mb-widget-label");
-  meter.append(fill, label);
+  const step = element("span", "mb-widget-step");
+  meter.append(fill, step, label);
   const local = element("span", "mb-badge mb-widget-count");
   const external = element("span", "mb-badge mb-widget-count mb-widget-external-count");
   root.append(grip, meter, local, external);
@@ -76,9 +78,11 @@ export function createWidget(store, openPanel, storage = globalThis.localStorage
     const state = widgetState(store.snapshot?.jobs || [], store.tag);
     label.textContent = state.label;
     fill.style.width = state.percent === null ? "0" : `${state.percent}%`;
+    step.hidden = !state.step;
+    step.style.width = state.step ? `${state.step.percent}%` : "0";
     root.classList.toggle("mb-widget-external", !state.idle && !state.mine);
     root.classList.toggle("mb-widget-idle", state.idle);
-    meter.title = `${state.label} · click for details`;
+    meter.title = [state.label, state.step?.label, "click for details"].filter(Boolean).join(" · ");
     for (const [el, chip] of [[local, state.local], [external, state.external]]) {
       el.hidden = chip.count === 0;
       el.textContent = String(chip.count);

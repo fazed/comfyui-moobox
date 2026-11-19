@@ -122,7 +122,9 @@ the Jobs sidebar icon (**Settings → MooBox → Jobs → Progress bar position*
 Jobs started from this browser tab are **Local builds**: you can stop a running build
 or remove a queued one. Jobs from other clients (API agents, another tab) are
 **External jobs** and stay read-only. Each group has a **History** dropdown with one
-collapsible entry per run; open a run to see its steps.
+collapsible entry per run; open a run to see its steps. When the active node reports steps (such as
+a sampler), the progress lines and the jobs widget show a second thin line for that node; hover it
+for the node name and step count.
 
 A small **jobs widget** sits in the top action bar: a progress meter with the current node and
 counts of local and external jobs. Click it to open the Jobs tab, drag its grip to float it

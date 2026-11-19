@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { acceptSnapshot, barJob, clientTag, createBars, createPanel, isLocal, nodeName, overallProgress, primaryNode, progress } from "../web/jobspanel.js";
+import { acceptSnapshot, barJob, clientTag, createBars, createPanel, isLocal, nodeName, overallProgress, primaryNode, progress, subProgress } from "../web/jobspanel.js";
 import { widgetState } from "../web/jobswidget.js";
 
 class Element {
@@ -56,6 +56,16 @@ test("lazy switches do not displace the node reporting step progress", () => {
   const switches = Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`9:${i}`, { value: 0, max: 1 }]));
   assert.equal(primaryNode({ nodes: { ...switches, "7:33": { value: 27, max: 40 } }, current_node: "9:0" })[0], "7:33");
   assert.equal(primaryNode({ nodes: {} }), null);
+});
+
+test("sub-progress follows the primary node with steps and hides without step updates", () => {
+  const job = { node_types: { 3: "KSampler", 9: "easy sleep" }, current_node: "9",
+    nodes: { 3: { value: 12, max: 30 }, 9: { value: 0, max: 1 } } };
+  assert.deepEqual(subProgress(job), { percent: 40, label: "KSampler · 12 / 30 steps" });
+  assert.equal(subProgress({ ...job, nodes: { 9: { value: 0, max: 1 } } }), null);
+  assert.equal(subProgress({ ...job, nodes: { 3: { value: 0, max: 0 } } }), null);
+  assert.equal(subProgress({ ...job, nodes: { 3: { max: 30 } } }), null);
+  assert.equal(subProgress({ nodes: {} }), null);
 });
 
 test("node labels distinguish repeated types and fall back when absent", () => {
@@ -119,8 +129,12 @@ test("widget chips mark the job type that waits behind the running one", () => {
   assert.deepEqual([state.local.count, state.external.count, state.external.waiting], [0, 2, false]);
   assert.equal(state.external.title, "External jobs: 1 running, 1 queued");
 
+  assert.equal(widgetState([mine], tag).step, null);
+  const sampling = { ...mine, node_types: { 1: "easy sleep", 2: "KSampler" }, nodes: { 1: { value: 0, max: 1 }, 2: { value: 6, max: 24 } } };
+  assert.deepEqual(widgetState([sampling], tag).step, { percent: 25, label: "KSampler · 6 / 24 steps" });
+
   state = widgetState([{ ...mine, status: "completed" }], tag);
-  assert.deepEqual([state.idle, state.label, state.local.count, state.external.count], [true, "Idle", 0, 0]);
+  assert.deepEqual([state.idle, state.label, state.step, state.local.count, state.external.count], [true, "Idle", null, 0, 0]);
 });
 
 test("bars show progress where the mode says and hide when idle", () => {
@@ -140,9 +154,19 @@ test("bars show progress where the mode says and hide when idle", () => {
     assert.ok(!tab.classes.has("mb-jobs-bar-active"));
     assert.ok(top.classes.has("mb-jobs-bar-external"));
     assert.equal(top.children[0].style.width, "50%");
+    assert.equal(top.children[1].hidden, true);
     mode = "Both";
+    jobs[0].nodes = { b: { value: 3, max: 4 } };
     bars.render();
     assert.ok(tab.classes.has("mb-jobs-bar-active"));
+    for (const bar of [top, tab]) {
+      assert.equal(bar.children[1].hidden, false);
+      assert.equal(bar.children[1].style.width, "75%");
+      assert.equal(bar.children[1].title, "B · 3 / 4 steps");
+    }
+    jobs[0].nodes = { b: { value: 0, max: 0 } };
+    bars.render();
+    assert.ok(top.children[1].hidden && tab.children[1].hidden);
     source.snapshot = { jobs: [] };
     bars.render();
     assert.ok(!top.classes.has("mb-jobs-bar-active") && !tab.classes.has("mb-jobs-bar-active"));
