@@ -1,5 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+import { outputKey } from "./previewstate.js";
 import "./styles.js";
 
 const COMPARE = "MooBoxImageCompare";
@@ -181,7 +182,11 @@ function compareWidgets(node) {
   return {
     refresh: show,
     // configure replaces the saved properties, so follow the loaded object.
-    configure() { state = node.properties.compare ??= state; show(); },
+    configure(saved) {
+      state = node.properties.compare ??= state;
+      if (saved) this.load(saved);
+      else show();
+    },
     stop: () => resizer.disconnect(),
     load(saved) {
       files.clear();
@@ -209,7 +214,8 @@ app.registerExtension({
     const configured = type.prototype.onConfigure;
     type.prototype.onConfigure = function () {
       configured?.apply(this, arguments);
-      this.compare?.configure();
+      // Undo and other graph reloads recreate the node: show the images of the last run again.
+      this.compare?.configure(app.nodeOutputs[outputKey(this)]?.compare);
     };
     const removed = type.prototype.onRemoved;
     type.prototype.onRemoved = function () {

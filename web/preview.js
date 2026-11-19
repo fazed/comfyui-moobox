@@ -1,7 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { glyph } from "./icons.js";
-import { counterText, stepIndex } from "./previewstate.js";
+import { counterText, outputKey, stepIndex } from "./previewstate.js";
 import "./styles.js";
 
 function element(tag, className, text) {
@@ -61,6 +61,13 @@ app.registerExtension({
     type.prototype.onNodeCreated = function () {
       created?.apply(this, arguments);
       this.showImages = previewWidget(this);
+    };
+    // Undo and other graph reloads recreate the node: show the images of the last run again.
+    const configured = type.prototype.onConfigure;
+    type.prototype.onConfigure = function () {
+      configured?.apply(this, arguments);
+      const output = app.nodeOutputs[outputKey(this)];
+      if (output?.previews) this.showImages(output.previews);
     };
     const executed = type.prototype.onExecuted;
     type.prototype.onExecuted = function (message) {

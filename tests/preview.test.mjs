@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
-import { counterText, stepIndex } from '../web/previewstate.js';
+import { counterText, outputKey, stepIndex } from '../web/previewstate.js';
 
 test('previous and next wrap around at both ends', () => {
   assert.equal(stepIndex(0, 1, 5), 1);
@@ -19,6 +19,15 @@ test('no images keeps the index at zero', () => {
 test('counter shows the position out of the total', () => {
   assert.equal(counterText(1, 5), '2 / 5');
   assert.equal(counterText(0, 0), '0 / 0');
+});
+
+test('the last results are found under the root id or the subgraph locator', () => {
+  assert.equal(outputKey({ id: 157, graph: { isRootGraph: true, id: 'root' } }), '157');
+  assert.equal(outputKey({ id: 190, graph: { isRootGraph: false, id: 'b33f' } }), 'b33f:190');
+});
+
+test('a cloned or pasted node without a graph has no results key', () => {
+  assert.equal(outputKey({ id: 5, graph: null }), null);
 });
 
 test('preview images uses mb- classes whose colours all come from tokens.css', async () => {
