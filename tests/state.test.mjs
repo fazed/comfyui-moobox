@@ -1,6 +1,115 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { activeLoraNames, activeWords, addLora, mergeLoraCode, reconcileWords, sameLora, splitWords } from '../web/state.js';
+import { activeLoraNames, activeWords, addLora, allWords, blockGroups, filterCount, filterLabel, folderRows, infoTabs, libraryRows, loraDetails, loraLabel, mergeLoraCode, parentFolder, pickerRows, pickLora, plainText, recipeEntries, recipeMeta, recipeRows, reconcileWords, rememberRecent, sameLora, splitWords, triggerGroups } from '../web/state.js';
+
+test('labels split a LoRA name into its title and folder', () => {
+  assert.deepEqual(loraLabel('chars\\style/ink.safetensors'), { title: 'ink', folder: 'chars / style' });
+  assert.deepEqual(loraLabel('plain.pt'), { title: 'plain', folder: '' });
+});
+
+test('picking a saved LoRA switches it on instead of adding it twice', () => {
+  const entries = [{ name: 'style\\ink.safetensors', strength: 0.4, clipStrength: 0.4, active: false, words: ['inked'] }];
+  const enabled = pickLora(entries, { name: 'style/ink.safetensors', strength: 1, clipStrength: 1, active: true, words: [] });
+  assert.deepEqual(enabled, [{ name: 'style\\ink.safetensors', strength: 0.4, clipStrength: 0.4, active: true, words: ['inked'] }]);
+  assert.equal(entries[0].active, false);
+  assert.equal(pickLora(entries, { name: 'ink.safetensors', active: true }).length, 2);
+});
+
+test('picker rows mark saved LoRAs as added or off and leave folders alone', () => {
+  const entries = [{ name: 'a\\on.safetensors' }, { name: 'off.safetensors', active: false }];
+  const rows = libraryRows([{ relative_path: 'a/on.safetensors', model_name: 'On' }, { relative_path: 'off' }, { relative_path: 'new.safetensors' }, { model_name: 'no path' }]);
+  assert.deepEqual(pickerRows([{ type: 'folder', name: 'a', path: 'a', count: 1 }, ...rows], entries), [
+    { type: 'folder', name: 'a', path: 'a', count: 1 },
+    { type: 'lora', path: 'a/on.safetensors', title: 'On', badge: 'Added' },
+    { type: 'lora', path: 'off', title: 'off', badge: 'Off' },
+    { type: 'lora', path: 'new.safetensors', title: 'new', badge: '' },
+  ]);
+  assert.deepEqual(libraryRows(undefined), []);
+});
+
+test('folder rows list subfolders with their path and count before the folder\'s LoRAs', () => {
+  const root = { count: 3, items: [{ relative_path: 'top', model_name: 'Top' }], folders: {
+    styles: { count: 2, items: [{ relative_path: 'styles/ink', model_name: 'Ink' }], folders: { old: { count: 1, items: [], folders: {} } } },
+  } };
+  assert.deepEqual(folderRows(root, ''), [{ type: 'folder', name: 'styles', path: 'styles', count: 2 }, { type: 'lora', path: 'top', title: 'Top' }]);
+  assert.deepEqual(folderRows(root, 'styles'), [{ type: 'folder', name: 'old', path: 'styles/old', count: 1 }, { type: 'lora', path: 'styles/ink', title: 'Ink' }]);
+  assert.deepEqual(folderRows(root, 'styles/old'), []);
+  assert.equal(folderRows(root, 'gone'), null);
+  assert.equal(parentFolder('styles/old'), 'styles');
+  assert.equal(parentFolder('styles'), '');
+});
+
+test('recent picks move to the front without duplicates or badges and are capped', () => {
+  let recent = [];
+  for (const path of ['a', 'b', 'a', 'c']) recent = rememberRecent(recent, { type: 'lora', path, title: path.toUpperCase(), badge: 'Added' }, 2);
+  assert.deepEqual(recent, [{ type: 'lora', path: 'c', title: 'C' }, { type: 'lora', path: 'a', title: 'A' }]);
+});
+
+test('the filter count matches LoRA Manager\'s badge and labels the button', () => {
+  assert.equal(filterCount(null), 0);
+  assert.equal(filterCount({ activeFolder: 'null', recursiveSearch: true, filters: {} }), 0);
+  assert.equal(filterCount({ activeFolder: 'styles', filters: { baseModel: ['SDXL 1.0', '__EMPTY_WILDCARD_RESULT__', ''], tags: { ink: 'include', sketch: 'exclude' }, autoTags: {}, license: { noCredit: 'include' }, modelTypes: ['LoRA'] } }), 6);
+  assert.equal(filterCount({ recursiveSearch: false, filters: null }), 1);
+  assert.equal(filterLabel(0), 'Filters');
+  assert.equal(filterLabel(3), 'Filters · 3');
+});
+
+test('recipes keep their LoRAs with strength and status and add only the ones in the library', () => {
+  const [recipe, empty] = recipeRows([
+    { id: 7, title: 'Ink portrait', file_url: '/api/lm/recipes/7.webp', base_model: 'SDXL 1.0', loras: [
+      { file_name: 'ink', modelName: 'Ink Style', strength: 0.6, inLibrary: true },
+      { file_name: 'gone', strength: '0.4', isDeleted: true },
+      { file_name: 'remote', weight: 0.8, inLibrary: false },
+      { file_name: 'skipped', exclude: true },
+      { name: 'legacy' },
+    ] },
+    { id: 'x', loras: [] },
+    { title: 'no id' },
+  ]);
+  assert.deepEqual(recipe.loras, [
+    { name: 'ink', title: 'Ink Style', strength: 0.6, status: 'ready' },
+    { name: 'gone', title: 'gone', strength: 0.4, status: 'deleted' },
+    { name: 'remote', title: 'remote', strength: 0.8, status: 'missing' },
+    { name: 'legacy', title: 'legacy', strength: 1, status: 'ready' },
+  ]);
+  assert.deepEqual([recipe.id, recipe.title, recipe.preview, recipeMeta(recipe)], ['7', 'Ink portrait', '/api/lm/recipes/7.webp', '4 LoRAs · SDXL 1.0']);
+  assert.deepEqual(recipeEntries(recipe), [
+    { name: 'ink', strength: 0.6, clipStrength: 0.6, linked: true, active: true, words: [] },
+    { name: 'legacy', strength: 1, clipStrength: 1, linked: true, active: true, words: [] },
+  ]);
+  assert.deepEqual([empty.title, recipeMeta(empty), recipeEntries(empty)], ['Untitled recipe', '0 LoRAs', []]);
+  assert.equal(recipeRows(undefined).length, 0);
+});
+
+test('details read usage tips from JSON text or objects and fall back for missing fields', () => {
+  const details = loraDetails({ usage_tips: '{"strength": "0.75", "strength_min": 0.5, "strength_max": 1, "clip_skip": 2}', civitai: { trainedWords: ['ink'] } }, 'style/ink.safetensors');
+  assert.deepEqual(details, { title: 'ink', preview: '', baseModel: 'Base model unknown', words: ['ink'], strength: 0.75, tips: 'Range 0.5–1 · CLIP skip 2', description: '' });
+  assert.equal(loraDetails({ usage_tips: 'not json' }, 'a').strength, undefined);
+  assert.equal(loraDetails({ usage_tips: { strength: 1, clip_strength: 0.6 } }, 'a').tips, 'CLIP 0.6');
+  assert.equal(loraDetails({ model_name: 'Ink', modelDescription: '<p>Model</p>' }, 'a').description, 'Model');
+});
+
+test('descriptions become plain text without markup', () => {
+  assert.equal(plainText('<p>One<br>two</p><img src=x onerror=alert(1)><p>&lt;b&gt; &amp; &quot;three&quot;</p>'), 'One\ntwo\n<b> & "three"');
+});
+
+test('trigger groups are trimmed copyable entries and copy all joins them', () => {
+  const groups = triggerGroups(['alpha, ink,', ' bold ', ', ', '(soft:1.2)']);
+  assert.deepEqual(groups, ['alpha, ink', 'bold', '(soft:1.2)']);
+  assert.equal(allWords(groups), 'alpha, ink, bold, (soft:1.2)');
+  assert.equal(allWords([]), '');
+  assert.deepEqual(loraDetails({ civitai: { trainedWords: [' ink, '] } }, 'a').words, ['ink']);
+});
+
+test('info tabs show Blocks only when the schema has blocks', () => {
+  assert.deepEqual(infoTabs([{ group: 'IN', ids: ['IN01'] }]), ['Overview', 'Description', 'Blocks', 'Notes']);
+  assert.deepEqual(infoTabs([]), ['Overview', 'Description', 'Notes']);
+});
+
+test('block schemas group block ids in schema order', () => {
+  assert.deepEqual(blockGroups([{ id: 'IN01', group: 'IN' }, { id: 'MID', group: 'MID' }, { id: 'IN02', group: 'IN' }]), [{ group: 'IN', ids: ['IN01', 'IN02'] }, { group: 'MID', ids: ['MID'] }]);
+  assert.deepEqual(blockGroups([]), []);
+});
 
 test('splits commas while preserving weighted and escaped parentheses', () => {
   assert.deepEqual(splitWords('alpha, (beta, gamma:0.8), cat \\(ears\\)'), ['alpha', '(beta, gamma:0.8)', 'cat \\(ears\\)']);
