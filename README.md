@@ -155,6 +155,17 @@ its extra model folders and special model support. Only that optional link requi
 LoRA Manager; changes to that node or its local API may later require an update of the link.
 The browser link uses LoRA Manager's existing model navigation in the new tab; filters
 in your ComfyUI tab are not changed.
+When LoRA Manager is installed, its **Send to ComfyUI** button can target the MooBox loader
+through LoRA Manager's adapter API (append or replace; a LoRA already in the list is switched
+on with the sent strength), and connected TriggerWord Toggle nodes follow the active LoRAs.
+With LoRA Manager installed, each row has an info button that shows LoRA Manager's local
+details read-only in tabs (Overview with preview, base model, copyable trigger words and usage
+tips; Description; Blocks; Notes), with a **Full details** link. **Add** in the top bar opens
+Quick Pick, modelled on LoRA Manager's: a LoRAs tab (folder or flat view, LoRA Manager's active
+filters, recently added LoRAs, a preview pane) and a read-only Recipes tab that appends a recipe's
+LoRAs that are in the library. Enter or a click adds and closes, Shift+Enter keeps it open.
+Picking a LoRA that is already in the list switches it on instead of adding it twice. The recent
+list is kept in this browser's local storage.
 
 Trigger words are stored in the workflow when added. With the default loader, the
 safetensors metadata is read first, then LoRA Manager's local metadata API if available.

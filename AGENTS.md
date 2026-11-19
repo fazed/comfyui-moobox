@@ -4,8 +4,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the layout of this pack and how to ad
 
 - Keep all custom behavior in this pack. Do not edit third-party packs or ComfyUI core.
 - Keep node IDs and saved widget names stable. New nodes use V3 schemas.
-- Never import LoRA Manager's private Python modules, JavaScript, CSS, or bundles.
-- Optional integration uses its registered node interface and local HTTP endpoints only.
+- Never import LoRA Manager's private Python modules, JavaScript, CSS, or bundles. The one exception is its documented third-party adapter module `lora_node_adapters.js` (served as `/extensions/comfyui-lora-manager/` or `/extensions/ComfyUI-Lora-Manager/`), loaded with an optional dynamic `import()`.
+- Optional integration uses its registered node interface, that adapter module and local HTTP endpoints only.
 - Browser links may use the manager's existing detail-navigation session keys in a new tab; never change filters in the originating canvas tab. The detail overlay is opened by clicking the single filtered card in a same-origin frame; touch no other manager DOM.
 - Keep the native ComfyUI loader usable without LoRA Manager.
 - Keep trigger selections, including temporarily absent groups, in workflow widget state.
