@@ -6,7 +6,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the layout of this pack and how to ad
 - Keep node IDs and saved widget names stable. New nodes use V3 schemas.
 - Never import LoRA Manager's private Python modules, JavaScript, CSS, or bundles. The one exception is its documented third-party adapter module `lora_node_adapters.js` (served as `/extensions/comfyui-lora-manager/` or `/extensions/ComfyUI-Lora-Manager/`), loaded with an optional dynamic `import()`.
 - Optional integration uses its registered node interface, that adapter module and local HTTP endpoints only.
-- Browser links may use the manager's existing detail-navigation session keys in a new tab; never change filters in the originating canvas tab. The detail overlay is opened by clicking the single filtered card in a same-origin frame; touch no other manager DOM.
+- Browser links may use the manager's existing detail-navigation session keys in a new tab; never change filters in the originating canvas tab. The detail overlay is opened by clicking the single filtered card in a same-origin frame; touch no other manager DOM. When a HEAD probe of `/lm-ui/` answers 2xx, link to the modern UI's `lm-ui/loras?open=<file_path>` route instead (`web/modernui.js`).
 - Keep the native ComfyUI loader usable without LoRA Manager.
 - Keep trigger selections, including temporarily absent groups, in workflow widget state.
 - No Internet access, model downloads, or writes to model files or metadata. The only exception is the tag list download, which runs only when the user clicks Download in the tag autocomplete settings.

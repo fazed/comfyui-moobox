@@ -154,7 +154,9 @@ The advanced setting **loader → LoRA Manager** uses the registered LoRA Manage
 its extra model folders and special model support. Only that optional link requires
 LoRA Manager; changes to that node or its local API may later require an update of the link.
 The browser link uses LoRA Manager's existing model navigation in the new tab; filters
-in your ComfyUI tab are not changed.
+in your ComfyUI tab are not changed. When LoRA Manager serves its modern UI at `/lm-ui/`,
+the **Manager** and **Full details** links open the LoRA there; otherwise (classic only, the
+modern UI not built, or no answer within 3 seconds) they open the classic `/loras` page.
 When LoRA Manager is installed, its **Send to ComfyUI** button can target the MooBox loader
 through LoRA Manager's adapter API (append or replace; a LoRA already in the list is switched
 on with the sent strength), and connected TriggerWord Toggle nodes follow the active LoRAs.

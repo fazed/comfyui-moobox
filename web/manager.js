@@ -1,3 +1,5 @@
+import { libraryPath, modernLoraPath, modernUiAvailable } from "./modernui.js";
+
 function modelKey(value) {
   return String(value || "").replaceAll("\\", "/").replace(/\.(safetensors|ckpt|pt|bin)$/i, "").replace(/\/+$/, "");
 }
@@ -49,15 +51,20 @@ function showLibraryDetail(url) {
 
 export async function openManagerPage() {
   const base = new URL("../../", import.meta.url);
-  const library = new URL("loras", base);
+  const library = new URL(libraryPath(false), base);
+  const modern = modernUiAvailable(base);
   const name = new URLSearchParams(window.location.search).get("name");
-  if (!name) { window.location.replace(library.href); return; }
+  if (!name) { window.location.replace(new URL(libraryPath(await modern), base).href); return; }
   const status = document.getElementById("status");
   const choices = document.getElementById("choices");
   const fallback = document.getElementById("library");
   fallback.href = library.href;
+  modern.then((found) => { fallback.href = new URL(libraryPath(found), base).href; });
   status.textContent = `Finding ${name} in LoRA Manager…`;
-  const navigate = (model) => {
+  // The modern UI opens a model from its file path; the classic page needs the hash handoff below.
+  const navigate = async (model) => {
+    const deepLink = modernLoraPath(model.file_path);
+    if (deepLink && await modern) { window.location.replace(new URL(deepLink, base).href); return; }
     try {
       prepareManagerNavigation(sessionStorage, model);
       showLibraryDetail(library.href);
