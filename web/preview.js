@@ -49,6 +49,8 @@ function previewWidget(node) {
   };
   root.addEventListener("pointerdown", (event) => event.stopPropagation());
   node.addDOMWidget("preview", "custom", root, { serialize: false, hideInPanel: true });
+  // New nodes start large enough to show an image. No minimum: it would stretch smaller saved sizes on load.
+  node.setSize([Math.max(node.size[0], 400), Math.max(node.size[1], 460)]);
   show();
   return (images) => { files = images; index = 0; show(); };
 }

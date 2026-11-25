@@ -30,6 +30,12 @@ test('a cloned or pasted node without a graph has no results key', () => {
   assert.equal(outputKey({ id: 5, graph: null }), null);
 });
 
+test('preview images starts large but sets no minimum that would stretch saved sizes on load', async () => {
+  const source = await readFile(new URL('../web/preview.js', import.meta.url), 'utf8');
+  assert.match(source, /node\.setSize\(\[Math\.max\(node\.size\[0\], 400\), Math\.max\(node\.size\[1\], 460\)\]\)/);
+  assert.doesNotMatch(source, /getMinHeight|computeLayoutSize/);
+});
+
 test('preview images uses mb- classes whose colours all come from tokens.css', async () => {
   const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
   assert.doesNotMatch(await read('../web/preview.js'), /kt-/);
