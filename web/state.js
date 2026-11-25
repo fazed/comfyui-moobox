@@ -147,6 +147,71 @@ export function plainText(html) {
     .replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (_, name) => ENTITIES[name]).replace(/\n{3,}/g, "\n\n").trim();
 }
 
+// Escapes, links and images (label only), **bold**, __bold__, *italic* and _italic_ (word boundaries only).
+const INLINE = /\\([\\*_])|!?\[([^\]]*)\]\([^)]*\)|\*\*(?=\S)((?:\\.|[^\\])+?)(?<=\S)\*\*|(?<!\w)__(?=\S)((?:\\.|[^\\])+?)(?<=\S)__(?!\w)|\*(?=\S)((?:\\.|[^\\])+?)(?<=\S)\*|(?<!\w)_(?=\S)((?:\\.|[^\\])+?)(?<=\S)_(?!\w)/g;
+const TABLE_SEPARATOR = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
+
+function addRun(runs, text, style) {
+  const last = runs.at(-1);
+  if (last?.text !== undefined && !!last.bold === !!style.bold && !!last.italic === !!style.italic) last.text += text;
+  else runs.push({ text, ...style });
+}
+
+function inlineRuns(text, style = {}) {
+  const runs = [];
+  let last = 0;
+  for (const match of text.matchAll(INLINE)) {
+    const [all, escaped, label, boldStar, boldUnder, italicStar, italicUnder] = match;
+    if (match.index > last) addRun(runs, text.slice(last, match.index), style);
+    if (escaped !== undefined) addRun(runs, escaped, style);
+    else if (label !== undefined) addRun(runs, label, style);
+    else if (boldStar !== undefined || boldUnder !== undefined) runs.push(...inlineRuns(boldStar ?? boldUnder, { ...style, bold: true }));
+    else runs.push(...inlineRuns(italicStar ?? italicUnder, { ...style, italic: true }));
+    last = match.index + all.length;
+  }
+  if (last < text.length) addRun(runs, text.slice(last), style);
+  return runs;
+}
+
+const cells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+const alignOf = (cell) => (cell.startsWith(":") && cell.endsWith(":") ? "center" : cell.endsWith(":") ? "right" : cell.startsWith(":") ? "left" : null);
+
+// Blocks for the description: headings (# to ###), paragraphs, bullet lists and pipe tables. Everything else stays text.
+export function markdownBlocks(text) {
+  const blocks = [];
+  const lines = text.split(/\r?\n/);
+  let paragraph = null;
+  let list = null;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const next = lines[i + 1] ?? "";
+    const heading = /^(#{1,3}) +(\S.*)$/.exec(line);
+    const item = /^\s*[-*+] +(\S.*)$/.exec(line);
+    if (!line.trim()) {
+      paragraph = list = null;
+    } else if (heading) {
+      blocks.push({ type: "heading", level: heading[1].length, runs: inlineRuns(heading[2]) });
+      paragraph = list = null;
+    } else if (line.includes("|") && next.includes("|") && TABLE_SEPARATOR.test(next)) {
+      const table = { type: "table", align: cells(next).map(alignOf), head: cells(line).map((cell) => inlineRuns(cell)), rows: [] };
+      for (i += 2; i < lines.length && lines[i].includes("|"); i++) table.rows.push(cells(lines[i]).map((cell) => inlineRuns(cell)));
+      blocks.push(table);
+      i--;
+      paragraph = list = null;
+    } else if (item) {
+      if (!list) blocks.push((list = { type: "list", items: [] }));
+      list.items.push(inlineRuns(item[1]));
+      paragraph = null;
+    } else {
+      list = null;
+      if (!paragraph) blocks.push((paragraph = { type: "paragraph", runs: [] }));
+      else addRun(paragraph.runs, "\n", {});
+      for (const { text, ...style } of inlineRuns(line.trim())) addRun(paragraph.runs, text, style);
+    }
+  }
+  return blocks;
+}
+
 function usageTips(value) {
   if (typeof value !== "string") return value || {};
   try {

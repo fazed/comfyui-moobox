@@ -1,7 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { glyph } from "./icons.js";
-import { activeLoraNames, activeWords, addLora, allWords, blockGroups, filterCount, filterLabel, folderRows, infoTabs, libraryRows, loraDetails, loraIndex, loraLabel, mergeLoraCode, parentFolder, pickerRows, pickLora, recipeEntries, recipeMeta, recipeRows, reconcileWords, rememberRecent, sameLora, splitWords } from "./state.js";
+import { activeLoraNames, activeWords, addLora, allWords, blockGroups, filterCount, filterLabel, folderRows, infoTabs, libraryRows, loraDetails, loraIndex, loraLabel, markdownBlocks, mergeLoraCode, parentFolder, pickerRows, pickLora, recipeEntries, recipeMeta, recipeRows, reconcileWords, rememberRecent, sameLora, splitWords } from "./state.js";
 import "./styles.js";
 
 const LOADER = "MooBoxLoraLoader";
@@ -262,12 +262,49 @@ function overviewPanel(view, name, status) {
   return overview;
 }
 
+// Markdown becomes elements filled with textContent only; links and images keep just their label.
+function markdownNodes(text) {
+  return markdownBlocks(text).map((block) => {
+    if (block.type === "heading") return withRuns(element(`h${block.level + 2}`, "mb-info-heading"), block.runs);
+    if (block.type === "paragraph") return withRuns(element("p", "mb-info-text"), block.runs);
+    if (block.type === "list") {
+      const list = element("ul", "mb-info-list");
+      list.append(...block.items.map((runs) => withRuns(element("li"), runs)));
+      return list;
+    }
+    const table = element("table", "mb-info-table");
+    table.append(...[block.head, ...block.rows].map((cells, row) => {
+      const tr = element("tr");
+      tr.append(...cells.map((runs, column) => {
+        const cell = withRuns(element(row ? "td" : "th"), runs);
+        if (block.align[column]) cell.dataset.align = block.align[column];
+        return cell;
+      }));
+      return tr;
+    }));
+    return table;
+  });
+}
+
+function withRuns(el, runs) {
+  el.append(...runs.map(inlineNode));
+  return el;
+}
+
+function inlineNode({ text, bold, italic }) {
+  const node = element(italic ? "em" : "span", "", text);
+  if (!bold) return node;
+  const strong = element("strong");
+  strong.append(node);
+  return strong;
+}
+
 // Panels per tab name; the server's description and notes only ever become text nodes.
 function infoPanels(entry, metadata, blocks, notes, status) {
   const view = loraDetails(metadata, entry.name);
   return {
     Overview: overviewPanel(view, entry.name, status),
-    Description: [view.description ? element("p", "mb-info-text", view.description) : element("span", "mb-muted", "No description")],
+    Description: view.description ? markdownNodes(view.description) : [element("span", "mb-muted", "No description")],
     Blocks: [...blocks.map(({ group, ids }) => element("span", "mb-info-blocks", `${group}: ${ids.join(", ")}`)),
       element("span", "mb-muted", `Every block uses the row strength ${entry.strength}.`)],
     Notes: [notes.trim() ? element("p", "mb-info-text mb-info-notes", notes.trim()) : element("span", "mb-muted", "No notes")],

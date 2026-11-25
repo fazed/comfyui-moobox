@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { activeLoraNames, activeWords, addLora, allWords, blockGroups, filterCount, filterLabel, folderRows, infoTabs, libraryRows, loraDetails, loraLabel, mergeLoraCode, parentFolder, pickerRows, pickLora, plainText, recipeEntries, recipeMeta, recipeRows, reconcileWords, rememberRecent, sameLora, splitWords, triggerGroups } from '../web/state.js';
+import { activeLoraNames, activeWords, addLora, allWords, blockGroups, filterCount, filterLabel, folderRows, infoTabs, libraryRows, loraDetails, loraLabel, markdownBlocks, mergeLoraCode, parentFolder, pickerRows, pickLora, plainText, recipeEntries, recipeMeta, recipeRows, reconcileWords, rememberRecent, sameLora, splitWords, triggerGroups } from '../web/state.js';
 
 test('labels split a LoRA name into its title and folder', () => {
   assert.deepEqual(loraLabel('chars\\style/ink.safetensors'), { title: 'ink', folder: 'chars / style' });
@@ -91,6 +91,53 @@ test('details read usage tips from JSON text or objects and fall back for missin
 
 test('descriptions become plain text without markup', () => {
   assert.equal(plainText('<p>One<br>two</p><img src=x onerror=alert(1)><p>&lt;b&gt; &amp; &quot;three&quot;</p>'), 'One\ntwo\n<b> & "three"');
+});
+
+test('markdown headings stop at ### and paragraphs break on single newlines', () => {
+  assert.deepEqual(markdownBlocks('# One\n## Two\n### Three\n#### Four'), [
+    { type: 'heading', level: 1, runs: [{ text: 'One' }] },
+    { type: 'heading', level: 2, runs: [{ text: 'Two' }] },
+    { type: 'heading', level: 3, runs: [{ text: 'Three' }] },
+    { type: 'paragraph', runs: [{ text: '#### Four' }] },
+  ]);
+  assert.deepEqual(markdownBlocks('one\ntwo\n\nthree'), [
+    { type: 'paragraph', runs: [{ text: 'one\ntwo' }] },
+    { type: 'paragraph', runs: [{ text: 'three' }] },
+  ]);
+});
+
+test('markdown bold and italic need word boundaries for underscores and can be escaped', () => {
+  assert.deepEqual(markdownBlocks('**a** __b__ *c* _d_ e_f_g \\*h\\*').at(0).runs, [
+    { text: 'a', bold: true }, { text: ' ' }, { text: 'b', bold: true }, { text: ' ' }, { text: 'c', italic: true },
+    { text: ' ' }, { text: 'd', italic: true }, { text: ' e_f_g *h*' },
+  ]);
+});
+
+test('markdown lists collect consecutive bullets with -, * or +', () => {
+  assert.deepEqual(markdownBlocks('- a\n* **b**\n+ c\n\n- d'), [
+    { type: 'list', items: [[{ text: 'a' }], [{ text: 'b', bold: true }], [{ text: 'c' }]] },
+    { type: 'list', items: [[{ text: 'd' }]] },
+  ]);
+});
+
+test('markdown tables need pipes in both rows and take alignment from the separator', () => {
+  assert.deepEqual(markdownBlocks('| Name | Size | Note |\n| :--- | :---: | ---: |\n| ink | 1 | **big** |\n| pen | 2 |'), [{
+    type: 'table',
+    align: ['left', 'center', 'right'],
+    head: [[{ text: 'Name' }], [{ text: 'Size' }], [{ text: 'Note' }]],
+    rows: [[[{ text: 'ink' }], [{ text: '1' }], [{ text: 'big', bold: true }]], [[{ text: 'pen' }], [{ text: '2' }]]],
+  }]);
+  assert.deepEqual(markdownBlocks('x | y\n---'), [{ type: 'paragraph', runs: [{ text: 'x | y\n---' }] }]);
+});
+
+test('markdown links and images keep only their label and HTML or code stay text', () => {
+  const links = JSON.stringify(markdownBlocks('[site](https://evil.test) and ![pic](x.png)'));
+  assert.equal(links, '[{"type":"paragraph","runs":[{"text":"site and pic"}]}]');
+  assert.deepEqual(markdownBlocks('<img src=x onerror=alert(1)>\n```js\nlet a = 1;\n```').at(0).runs, [
+    { text: '<img src=x onerror=alert(1)>\n```js\nlet a = 1;\n```' },
+  ]);
+  assert.deepEqual(markdownBlocks(''), []);
+  assert.deepEqual(markdownBlocks(' \n\n'), []);
 });
 
 test('trigger groups are trimmed copyable entries and copy all joins them', () => {

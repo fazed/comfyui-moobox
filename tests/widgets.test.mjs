@@ -40,7 +40,7 @@ async function harness(fetchApi, dynamicModules = {}, console = globalThis.conso
     head: new Element(),
     body: new Element(),
     listeners,
-    createElement: () => { const el = new Element(); el.document = document; return el; },
+    createElement: (tag) => { const el = new Element(); el.tagName = tag.toUpperCase(); el.document = document; return el; },
     addEventListener: (type, listener) => listeners.add(listener),
     removeEventListener: (type, listener) => listeners.delete(listener),
   };
@@ -421,6 +421,36 @@ test('the info popover says details are unavailable and closes on outside clicks
   widget.onRemove();
   assert.equal(document.body.children.length, 0);
   assert.equal(document.listeners.size, 0);
+});
+
+test('the description tab renders markdown as elements and never as links, images or HTML', async () => {
+  const description = '## Usage\n\nUse **bold** and *soft*.\n- one\n- two\n\n| a | b |\n| :-- | --: |\n| [x](https://evil.test) | &lt;img src=x onerror=alert(1)&gt; |\n\n![pic](https://evil.test/p.png)';
+  const { node, document, extension } = await harness(async (path) => {
+    if (path.startsWith('/lm/loras/details')) return ok({ success: true, metadata: { civitai: { trainedWords: ['alpha'] }, description } });
+    if (path.startsWith('/lm/loras/block-weight-schema')) return ok({ success: true, schema: { blocks: [] } });
+    return { ok: false, status: 404 };
+  }, {}, globalThis.console, MANAGER);
+  const { widget } = extension.getCustomWidgets().MOOBOX_LORAS(node, 'loras');
+  widget.value = JSON.stringify([{ name: 'alpha', strength: 1, clipStrength: 1 }]);
+  labelled(widget.element, 'Show details for alpha').click();
+  await tick();
+  const box = document.body.children[0];
+  labelled(box, 'Description').click();
+  const body = find(box, (el) => el.className === 'mb-info-body');
+  const tag = (name) => find(body, (el) => el.tagName === name);
+  const textOf = (el) => el.textContent ?? el.children.map(textOf).join('');
+  assert.equal(textOf(tag('H4')), 'Usage');
+  assert.equal(textOf(tag('STRONG')), 'bold');
+  assert.equal(textOf(tag('EM')), 'soft');
+  assert.equal(tag('UL').children.length, 2);
+  const table = tag('TABLE');
+  assert.equal(table.children[0].children[0].dataset.align, 'left');
+  assert.equal(table.children[0].children[1].dataset.align, 'right');
+  assert.equal(textOf(table.children[1].children[0]), 'x');
+  assert.equal(textOf(table.children[1].children[1]), '<img src=x onerror=alert(1)>');
+  assert.equal(find(body, (el) => el.tagName === 'IMG' || el.tagName === 'A'), undefined);
+  assert.equal(find(body, (el) => el.attributes.href !== undefined || el.attributes.src !== undefined), undefined);
+  assert.ok(find(body, (el) => el.tagName === 'P' && textOf(el) === 'pic'));
 });
 
 test('the info popover hides the Blocks tab without blocks and says when there is no description or notes', async () => {
