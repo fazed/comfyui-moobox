@@ -147,13 +147,13 @@ export function plainText(html) {
     .replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (_, name) => ENTITIES[name]).replace(/\n{3,}/g, "\n\n").trim();
 }
 
-// Escapes, links and images (label only), **bold**, __bold__, *italic* and _italic_ (word boundaries only).
-const INLINE = /\\([\\*_])|!?\[([^\]]*)\]\([^)]*\)|\*\*(?=\S)((?:\\.|[^\\])+?)(?<=\S)\*\*|(?<!\w)__(?=\S)((?:\\.|[^\\])+?)(?<=\S)__(?!\w)|\*(?=\S)((?:\\.|[^\\])+?)(?<=\S)\*|(?<!\w)_(?=\S)((?:\\.|[^\\])+?)(?<=\S)_(?!\w)/g;
+// Escapes, `code`, links and images (label only), **bold**, __bold__, *italic* and _italic_ (word boundaries only).
+const INLINE = /\\([\\*_])|(?<!`)`([^`\n]+)`(?!`)|!?\[([^\]]*)\]\([^)]*\)|\*\*(?=\S)((?:\\.|[^\\])+?)(?<=\S)\*\*|(?<!\w)__(?=\S)((?:\\.|[^\\])+?)(?<=\S)__(?!\w)|\*(?=\S)((?:\\.|[^\\])+?)(?<=\S)\*|(?<!\w)_(?=\S)((?:\\.|[^\\])+?)(?<=\S)_(?!\w)/g;
 const TABLE_SEPARATOR = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
 
 function addRun(runs, text, style) {
   const last = runs.at(-1);
-  if (last?.text !== undefined && !!last.bold === !!style.bold && !!last.italic === !!style.italic) last.text += text;
+  if (last?.text !== undefined && !last.code && !style.code && !!last.bold === !!style.bold && !!last.italic === !!style.italic) last.text += text;
   else runs.push({ text, ...style });
 }
 
@@ -161,9 +161,10 @@ function inlineRuns(text, style = {}) {
   const runs = [];
   let last = 0;
   for (const match of text.matchAll(INLINE)) {
-    const [all, escaped, label, boldStar, boldUnder, italicStar, italicUnder] = match;
+    const [all, escaped, code, label, boldStar, boldUnder, italicStar, italicUnder] = match;
     if (match.index > last) addRun(runs, text.slice(last, match.index), style);
     if (escaped !== undefined) addRun(runs, escaped, style);
+    else if (code !== undefined) runs.push({ text: code, ...style, code: true });
     else if (label !== undefined) addRun(runs, label, style);
     else if (boldStar !== undefined || boldUnder !== undefined) runs.push(...inlineRuns(boldStar ?? boldUnder, { ...style, bold: true }));
     else runs.push(...inlineRuns(italicStar ?? italicUnder, { ...style, italic: true }));

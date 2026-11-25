@@ -291,8 +291,8 @@ function withRuns(el, runs) {
   return el;
 }
 
-function inlineNode({ text, bold, italic }) {
-  const node = element(italic ? "em" : "span", "", text);
+function inlineNode({ text, bold, italic, code }) {
+  const node = element(code ? "code" : italic ? "em" : "span", "", text);
   if (!bold) return node;
   const strong = element("strong");
   strong.append(node);

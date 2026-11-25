@@ -113,6 +113,12 @@ test('markdown bold and italic need word boundaries for underscores and can be e
   ]);
 });
 
+test('markdown inline code stays raw, is not merged with neighbouring text and needs a single backtick pair', () => {
+  assert.deepEqual(markdownBlocks('a `**b**` c``d`').at(0).runs, [
+    { text: 'a ' }, { text: '**b**', code: true }, { text: ' c``d`' },
+  ]);
+});
+
 test('markdown lists collect consecutive bullets with -, * or +', () => {
   assert.deepEqual(markdownBlocks('- a\n* **b**\n+ c\n\n- d'), [
     { type: 'list', items: [[{ text: 'a' }], [{ text: 'b', bold: true }], [{ text: 'c' }]] },

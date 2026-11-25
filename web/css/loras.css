@@ -44,6 +44,7 @@
 .mb-info-head { display: flex; gap: 10px; }
 .mb-info-preview { flex: 0 0 72px; width: 72px; height: 96px; object-fit: cover; border-radius: var(--mb-r-s); background: var(--mb-field); }
 .mb-info-section { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.mb-info-section code { padding: 0 4px; border-radius: var(--mb-r-s); background: var(--mb-field); font-family: monospace; }
 .mb-info-word { gap: 2px; padding: 0 2px 0 10px; color: var(--mb-text); }
 .mb-info-word > span { min-width: 0; overflow-wrap: anywhere; }
 .mb-info-word > .mb-icon { min-width: 22px; min-height: 22px; border-radius: 999px; }
