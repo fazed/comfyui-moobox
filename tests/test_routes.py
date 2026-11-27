@@ -190,5 +190,51 @@ class SystemRouteTests(unittest.TestCase):
         self.assertEqual(self.system("cpu")["vram"], None)
 
 
+class JsonRequest:
+    def __init__(self, body):
+        self.body = body
+
+    async def json(self):
+        return self.body
+
+
+class SaveExportRouteTests(unittest.TestCase):
+    def setUp(self):
+        self.temp, self.output = tempfile.mkdtemp(), tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.temp)
+        self.addCleanup(shutil.rmtree, self.output)
+        for item in (patch.object(paths, "get_temp_directory", Mock(return_value=self.temp), create=True),
+                     patch.object(paths, "get_output_directory", Mock(return_value=self.output), create=True)):
+            item.start()
+            self.addCleanup(item.stop)
+        self.image = {"filename": "MooBoxSave_0123456789ab_00000.png", "subfolder": "", "type": "temp"}
+        with open(os.path.join(self.temp, self.image["filename"]), "wb") as file:
+            file.write(b"png bytes")
+        with open(os.path.join(self.temp, self.image["filename"] + ".export.json"), "w") as file:
+            json.dump({"run": "0123456789ab", "index": 0, "folder": [], "name": "Pic", "digits": 5, "counter": False, "overwrite": False, "caption": None, "workflow": None}, file)
+
+    def export(self, body):
+        return asyncio.run(routes.export_saved(JsonRequest(body)))
+
+    def test_saves_the_preview_and_returns_the_output_files(self):
+        self.assertEqual(json.loads(self.export({"images": [self.image]}).text), {"saved": [{"filename": "Pic.png", "subfolder": "", "type": "output"}]})
+        with open(os.path.join(self.output, "Pic.png"), "rb") as file:
+            self.assertEqual(file.read(), b"png bytes")
+
+    def test_bad_requests_and_traversal_are_rejected(self):
+        for body in ({}, [], {"images": "x"}, {"images": [{**self.image, "filename": "..\\..\\secret.png"}]}, {"images": [{**self.image, "type": "output"}]}):
+            response = self.export(body)
+            self.assertEqual(response.status, 400, body)
+            self.assertTrue(json.loads(response.text)["error"])
+        self.assertEqual(os.listdir(self.output), [])
+
+    # Returned instead of raised, so ComfyUI's middleware keeps the message.
+    def test_gone_preview_is_not_found_with_a_clear_message(self):
+        os.remove(os.path.join(self.temp, self.image["filename"]))
+        response = self.export({"images": [self.image]})
+        self.assertEqual(response.status, 404)
+        self.assertIn("Run the workflow again", json.loads(response.text)["error"])
+
+
 if __name__ == "__main__":
     unittest.main()

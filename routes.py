@@ -14,6 +14,7 @@ import comfy.utils
 import folder_paths
 from server import PromptServer
 
+from .image_metadata import export_previews
 from .jobs import install as install_jobs
 from .logic import lora_family
 from .nodes import TAGS_FILE, resolve_lora
@@ -95,6 +96,22 @@ async def preview(request: web.Request) -> web.Response:
     if path is None:
         raise web.HTTPNotFound()
     return web.FileResponse(path, headers={"Cache-Control": "max-age=300"})
+
+
+@PromptServer.instance.routes.post("/moobox-save/export")
+async def export_saved(request: web.Request) -> web.Response:
+    try:
+        body = await request.json()
+        images = body.get("images") if isinstance(body, dict) else None
+        saved = await asyncio.to_thread(export_previews, folder_paths.get_temp_directory(), folder_paths.get_output_directory(), images)
+    # Returned, not raised: ComfyUI's middleware replaces the text of a raised HTTP error with a generic one.
+    except FileNotFoundError as error:
+        return web.json_response({"error": str(error)}, status=404)
+    except FileExistsError as error:
+        return web.json_response({"error": str(error)}, status=409)
+    except ValueError as error:
+        return web.json_response({"error": str(error)}, status=400)
+    return web.json_response({"saved": saved})
 
 
 # cpu_percent(interval=None) measures since the previous call; this first call sets the baseline.

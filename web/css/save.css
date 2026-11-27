@@ -1,0 +1,8 @@
+/* A plain row at the top: Nodes 2.0 stretches the widget over the node's spare height. */
+/* Sized by its content, unlike the .mb panels: next to the image preview it would otherwise collapse. */
+.mb-save { flex-direction: row; align-items: flex-start; gap: 8px; height: auto; padding: 2px 0; contain: none; border: 0; background: transparent; }
+.mb-save > .mb-btn { min-height: 26px; padding: 2px 10px; }
+.mb-save-status { line-height: 26px; }
+.mb-save-status { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-save-status[data-state="ok"] { color: var(--mb-ok); }
+.mb-save-status[data-state="error"] { color: var(--mb-bad); }
