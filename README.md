@@ -89,6 +89,28 @@ Restart ComfyUI afterwards. No extra packages or build step are needed.
   Switch on **add to assets** to also add the images to the assets panel; in the classic view
   they then also show as ComfyUI's own preview.
 
+- **Save Image (MooBox)**: saves PNG, JPEG or WebP with metadata that LoRA Manager's recipe import
+  and Civitai read. It walks the prompt graph upstream from `images` to the base sampler (KSampler,
+  KSamplerAdvanced, SamplerCustom, SamplerCustomAdvanced; the highest denoise wins, so hires and
+  detailer passes do not replace it), the prompt texts, clip skip, the LoRA loaders (core, MooBox,
+  LoRA Manager, rgthree Power Lora Loader, `<lora:name:weight>` tags in the prompt) and the
+  checkpoint or diffusion model. Fields it cannot work out are left out; connect the optional
+  `positive`, `negative`, `loras`, `checkpoint`, `seed`, `steps`, `cfg`, `sampler_name` or
+  `scheduler` inputs to set them yourself. It writes:
+  - A1111 `parameters` with `Hashes` and `Civitai resources` (`save_with_metadata`, `add_loras_to_prompt`, `additional_data`);
+  - the ComfyUI prompt and workflow (`embed_workflow`); dragging a PNG or WebP into ComfyUI restores the graph (ComfyUI
+    does not read it from a JPEG). A JPEG that cannot hold them all drops the prompt, then the workflow;
+  - a LoRA Manager `Recipe metadata` block with the LoRAs, checkpoint and settings (`recipe_metadata`).
+
+  Hashes come from a `<model>.sha256` file, LoRA Manager's `<model>.metadata.json`, or are computed
+  once and kept in `user/moobox/model_hashes.json`; Civitai ids only from the local
+  `.metadata.json` or `.civitai.info`. Nothing is downloaded and model folders are never written.
+  `filename_prefix` takes subfolders and the tokens listed in its tooltip; `counter` off with
+  `overwrite` off adds `_0001` instead of replacing a file. Switch `save` off to preview in the
+  temp folder with the same metadata; the **Save** button then saves the images of the last run,
+  named and with the sidecars (`caption_txt`, `save_workflow_as_json`) as a normal save of that run.
+  Previews are gone after ComfyUI restarts.
+
 ### MooBox / Prompt
 
 Type in a text field of a node (Nodes 2.0 and classic) and suggestions from your
