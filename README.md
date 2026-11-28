@@ -89,14 +89,14 @@ Restart ComfyUI afterwards. No extra packages or build step are needed.
   Switch on **add to assets** to also add the images to the assets panel; in the classic view
   they then also show as ComfyUI's own preview.
 
-- **Save Image (MooBox)**: saves PNG, JPEG or WebP with metadata that LoRA Manager's recipe import
+- **Save Image Advanced (MooBox)**: saves PNG, JPEG or WebP with metadata that LoRA Manager's recipe import
   and Civitai read. It walks the prompt graph upstream from `images` to the base sampler (KSampler,
   KSamplerAdvanced, SamplerCustom, SamplerCustomAdvanced; the highest denoise wins, so hires and
   detailer passes do not replace it), the prompt texts, clip skip, the LoRA loaders (core, MooBox,
   LoRA Manager, rgthree Power Lora Loader, `<lora:name:weight>` tags in the prompt) and the
   checkpoint or diffusion model. Fields it cannot work out are left out; connect the optional
-  `positive`, `negative`, `loras`, `checkpoint`, `seed`, `steps`, `cfg`, `sampler_name` or
-  `scheduler` inputs to set them yourself. It writes:
+  `positive`, `negative`, `loras` or `checkpoint` inputs to set those yourself. Seed, steps, CFG,
+  sampler and scheduler always come from the sampler in the graph. It writes:
   - A1111 `parameters` with `Hashes` and `Civitai resources` (`save_with_metadata`, `add_loras_to_prompt`, `additional_data`);
   - the ComfyUI prompt and workflow (`embed_workflow`); dragging a PNG or WebP into ComfyUI restores the graph (ComfyUI
     does not read it from a JPEG). A JPEG that cannot hold them all drops the prompt, then the workflow;
@@ -109,7 +109,18 @@ Restart ComfyUI afterwards. No extra packages or build step are needed.
   `overwrite` off adds `_0001` instead of replacing a file. Switch `save` off to preview in the
   temp folder with the same metadata; the **Save** button then saves the images of the last run,
   named and with the sidecars (`caption_txt`, `save_workflow_as_json`) as a normal save of that run.
-  Previews are gone after ComfyUI restarts.
+  Previews are gone after ComfyUI restarts. Workflows saved before the rename keep working: the
+  node id is still `MooBoxSaveImage`.
+
+- **Save Image (MooBox)**: the simple variant, with only `images`, `filename_prefix` and
+  `file_format`. Each format shows just its own options: `compress_level` for PNG, `quality` and
+  `jpeg_subsampling` for JPEG, `lossless_webp`, `quality` (hidden while lossless is on) and
+  `webp_method` for WebP. The defaults match the advanced node, and a format keeps its values while
+  you switch back and forth (after a reload only the chosen format's values remain). It reads the
+  graph like the advanced node and always saves to the output folder with a counter, the A1111
+  parameters, `<lora:...>` tags after the prompt and the LoRA Manager recipe block. It does not
+  embed the ComfyUI workflow, so dragging its PNG or WebP into ComfyUI does not restore the graph;
+  use the advanced node for that, for overrides, sidecars or the Save button. No outputs.
 
 ### MooBox / Prompt
 

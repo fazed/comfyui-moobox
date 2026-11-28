@@ -317,6 +317,7 @@ class SaveNodeTests(unittest.TestCase):
         prompt = graph()
         prompt["1"]["inputs"]["ckpt_name"] = "base.safetensors"
         self.save.MooBoxSaveImage.hidden = types.SimpleNamespace(prompt=prompt, extra_pnginfo={"workflow": {"nodes": [1, 2]}}, unique_id="9")
+        self.save.MooBoxSaveImageSimple.hidden = self.save.MooBoxSaveImage.hidden
 
     def tearDown(self):
         import shutil
@@ -387,13 +388,32 @@ class SaveNodeTests(unittest.TestCase):
             self.assertIn("<lora:style:0.8> <lora:eyes:0.5>", image.info["parameters"])
 
     def test_without_metadata_and_with_overrides(self):
-        output = self.run_node(save_with_metadata=False, embed_workflow=False, positive="override", seed=7, loras="<lora:style:0.3>")
-        self.assertTrue(output.result[1].startswith("override\nNegative prompt: lowres\n"))
-        self.assertIn("Seed: 7", output.result[1])
+        output = self.run_node(save_with_metadata=False, embed_workflow=False, positive="override", negative="bad", loras="<lora:style:0.3>", checkpoint="style.safetensors")
+        self.assertTrue(output.result[1].startswith("override\nNegative prompt: bad\n"))
         self.assertIn('weight":0.3', output.result[1])
-        with Image.open(os.path.join(self.output, "run", "base_7_00001_.png")) as image:
+        self.assertIn("Model: style,", output.result[1])
+        # Seed, steps, CFG, sampler and scheduler always come from the graph.
+        self.assertIn("Steps: 28, Sampler: Euler a Karras, CFG scale: 5.5, Seed: 42,", output.result[1])
+        with Image.open(os.path.join(self.output, "run", "style_42_00001_.png")) as image:
             image.load()
             self.assertEqual(image.info.get("parameters"), None)
+
+    def test_schema_keeps_only_the_four_overrides(self):
+        optional = [item.id for item in self.save.MooBoxSaveImage.define_schema().inputs if item.optional]
+        self.assertEqual(optional, ["positive", "negative", "loras", "checkpoint"])
+
+    def test_links_to_removed_inputs_of_saved_workflows_are_ignored(self):
+        # ComfyUI passes a link that a saved workflow keeps to a removed input as a keyword argument.
+        output = self.run_node(seed=7, steps=1, cfg=1.0, sampler_name="ddim", scheduler="normal")
+        self.assertIn("Steps: 28, Sampler: Euler a Karras, CFG scale: 5.5, Seed: 42,", output.result[1])
+        recipe = json.loads(self.read_parameters(output).split("Recipe metadata: ")[1])
+        self.assertEqual({key: recipe["gen_params"][key] for key in ("seed", "steps", "cfg_scale", "sampler")}, {"seed": 42, "steps": 28, "cfg_scale": 5.5, "sampler": "Euler a Karras"})
+
+    def read_parameters(self, output):
+        image = output.ui["images"][0]
+        with Image.open(os.path.join(self.output, image["subfolder"], image["filename"])) as file:
+            file.load()
+            return file.info["parameters"]
 
     def test_broken_graph_still_saves_the_image(self):
         self.save.MooBoxSaveImage.hidden.prompt["2"]["inputs"]["strength_model"] = {"weird": True}
@@ -420,6 +440,87 @@ class SaveNodeTests(unittest.TestCase):
                 self.assertEqual(source.read(), target.read())
         self.assertTrue(os.path.isfile(os.path.join(self.output, "run", "base_42_00001_.txt")))
 
+    def test_advanced_schema_only_changes_its_display_name(self):
+        schema = self.save.MooBoxSaveImage.define_schema()
+        self.assertEqual((schema.node_id, schema.display_name, schema.category), ("MooBoxSaveImage", "Save Image Advanced (MooBox)", "MooBox/Utility"))
+        self.assertEqual([item.id for item in schema.inputs], [
+            "images", "filename_prefix", "file_format", "save", "embed_workflow", "recipe_metadata", "add_loras_to_prompt", "save_with_metadata", "counter",
+            "overwrite", "quality", "lossless_webp", "webp_method", "jpeg_subsampling", "compress_level", "optimize_png", "easy_remix", "save_workflow_as_json",
+            "caption_txt", "additional_data", "positive", "negative", "loras", "checkpoint"])
+        self.assertEqual([item.id for item in schema.outputs], ["images", "parameters"])
+        self.assertTrue(all(item.advanced for item in schema.inputs if item.id in ("quality", "webp_method", "jpeg_subsampling", "compress_level")))
+
+    def test_simple_schema_has_only_images_prefix_and_format_and_no_outputs(self):
+        schema = self.save.MooBoxSaveImageSimple.define_schema()
+        self.assertEqual((schema.node_id, schema.display_name, schema.category, schema.is_output_node), ("MooBoxSaveImageSimple", "Save Image (MooBox)", "MooBox/Utility", True))
+        self.assertEqual([(item.id, item.optional) for item in schema.inputs], [("images", False), ("filename_prefix", False), ("file_format", False)])
+        self.assertEqual(schema.outputs, [])
+        node_info = self.save.MooBoxSaveImageSimple.GET_NODE_INFO_V1()
+        self.assertEqual((node_info["output"], node_info["output_node"]), ([], True))
+        self.assertEqual(set(node_info["input"]["required"]), {"images", "filename_prefix", "file_format"})
+        self.assertNotIn("optional", node_info["input"])
+
+    def test_simple_format_shows_only_its_own_options_with_the_advanced_defaults(self):
+        file_format = self.save.MooBoxSaveImageSimple.define_schema().inputs[2]
+        options = {option.key: option.inputs for option in file_format.options}
+        self.assertEqual({key: [item.id for item in inputs] for key, inputs in options.items()},
+                         {"png": ["compress_level"], "jpeg": ["quality", "jpeg_subsampling"], "webp": ["lossless_webp", "webp_method"]})
+        lossless = {option.key: [item.id for item in option.inputs] for option in options["webp"][0].options}
+        # Quality is hidden while lossless WebP is on; png is the first and default format, like the advanced node.
+        self.assertEqual(lossless, {"off": ["quality"], "on": []})
+        self.assertEqual(list(options), list(self.save.EXTENSIONS))
+        advanced = {item.id: item.as_dict() for item in self.save.MooBoxSaveImage.define_schema().inputs}
+        simple = [*options["png"], *options["jpeg"], options["webp"][1], *options["webp"][0].options[0].inputs]
+        for item in simple:
+            self.assertEqual({**item.as_dict(), "advanced": True}, advanced[item.id], item.id)
+
+    def run_simple(self, flat, count=1):
+        # The executor's own path from the flat prompt inputs (file_format.lossless_webp.quality ...) to execute().
+        io = importlib.import_module("comfy_api.latest._io")
+        flat = {"filename_prefix": "run/%model%_%seed%", **flat}
+        _, _, v3_data = io.get_finalized_class_inputs(self.save.MooBoxSaveImageSimple.INPUT_TYPES(), flat)
+        return self.save.MooBoxSaveImageSimple.execute(torch.rand(count, 16, 24, 3), **io.build_nested_inputs(flat, v3_data))
+
+    def test_simple_node_saves_with_its_fixed_settings(self):
+        self.assertEqual(self.save.SIMPLE_SETTINGS, {
+            "save": True, "embed_workflow": False, "recipe_metadata": True, "add_loras_to_prompt": True, "save_with_metadata": True, "counter": True,
+            "overwrite": False, "easy_remix": False, "save_workflow_as_json": False, "caption_txt": False, "additional_data": "", "overrides": {}})
+        output = self.run_simple({"file_format": "png", "file_format.compress_level": 9}, count=2)
+        self.assertIsNone(output.result)
+        self.assertEqual(output.ui, {"images": [{"filename": f"base_42_0000{index}_.png", "subfolder": "run", "type": "output"} for index in (1, 2)]})
+        # No sidecars, and the counter never overwrites.
+        self.assertEqual(self.run_simple({"file_format": "png", "file_format.compress_level": 9}).ui["images"][0]["filename"], "base_42_00003_.png")
+        self.assertEqual(sorted(os.listdir(os.path.join(self.output, "run"))), ["base_42_00001_.png", "base_42_00002_.png", "base_42_00003_.png"])
+        with Image.open(os.path.join(self.output, "run", "base_42_00001_.png")) as image:
+            image.load()
+            self.assertEqual(sorted(image.info), ["parameters"])
+            parameters = image.info["parameters"]
+        self.assertTrue(parameters.startswith("1girl, smile\n<lora:style:0.8> <lora:eyes:0.5>\nNegative prompt: lowres\nSteps: 28, Sampler: Euler a Karras, CFG scale: 5.5, Seed: 42,"))
+        recipe = json.loads(parameters.split("Recipe metadata: ")[1])
+        self.assertEqual([lora["file_name"] for lora in recipe["loras"]], ["style", "eyes"])
+        self.assertEqual(recipe["loras"][0]["modelVersionId"], 12)
+
+    def test_simple_node_writes_each_format_with_its_options(self):
+        cases = [({"file_format": "jpeg", "file_format.quality": 80, "file_format.jpeg_subsampling": "4:4:4"}, {"quality": 80, "jpeg_subsampling": "4:4:4"}),
+                 ({"file_format": "webp", "file_format.lossless_webp": "off", "file_format.lossless_webp.quality": 70, "file_format.webp_method": 6},
+                  {"quality": 70, "lossless_webp": False, "webp_method": 6}),
+                 ({"file_format": "webp", "file_format.lossless_webp": "on", "file_format.webp_method": 0}, {"quality": 95, "lossless_webp": True, "webp_method": 0}),
+                 ({"file_format": "png", "file_format.compress_level": 1}, {"compress_level": 1, "optimize_png": False})]
+        for flat, expected in cases:
+            with patch.object(self.save, "write_image", wraps=self.save.write_image) as write:
+                output = self.run_simple(flat)
+            options = write.call_args.args[5]
+            self.assertEqual({key: options[key] for key in expected}, expected, flat)
+            with Image.open(os.path.join(self.output, "run", output.ui["images"][0]["filename"])) as image:
+                image.load()
+                if flat["file_format"] == "png":
+                    self.assertIn("Recipe metadata: {", image.info["parameters"])
+                    continue
+                make, model, comment = self.exif_text(image)
+            # Without embed_workflow there is no prompt or workflow, only the parameters with the recipe block.
+            self.assertEqual((make, model), ("", ""), flat)
+            self.assertIn("<lora:style:0.8> <lora:eyes:0.5>", comment)
+            self.assertIn("Recipe metadata: {", comment)
 
     def test_user_comment_is_typed_undefined(self):
         data = self.save.exif_bytes("héllo", {0x010F: "workflow:{}"})

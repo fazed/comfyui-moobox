@@ -152,12 +152,110 @@ def write_image(image: Image.Image, path: str, file_format: str, parameters: str
         image.save(path, quality=options["quality"], lossless=options["lossless_webp"], method=options["webp_method"], **({"exif": exif} if exif else {}))
 
 
+DEFAULT_QUALITY = 95
+
+
+# Format options of both nodes, so their defaults stay identical.
+def quality_input(**extra):
+    return io.Int.Input("quality", default=DEFAULT_QUALITY, min=1, max=100, tooltip="JPEG and lossy WebP quality.", **extra)
+
+
+def webp_method_input(**extra):
+    return io.Int.Input("webp_method", default=4, min=0, max=6, tooltip="WebP effort: 0 is fastest, 6 smallest.", **extra)
+
+
+def jpeg_subsampling_input(**extra):
+    return io.Combo.Input("jpeg_subsampling", options=list(SUBSAMPLING), **extra)
+
+
+def compress_level_input(**extra):
+    return io.Int.Input("compress_level", default=4, min=0, max=9, tooltip="PNG compression level.", **extra)
+
+
+def generation(hidden, width: int, height: int, easy_remix: bool, overrides: dict) -> dict:
+    gen = extract_generation(hidden.prompt, str(hidden.unique_id), tag_categories())
+    for name, key in (("positive", "prompt"), ("negative", "negative_prompt")):
+        if overrides.get(name) is not None:
+            gen[key] = overrides[name]
+    if overrides.get("checkpoint"):
+        gen["checkpoint"] = (overrides["checkpoint"], "checkpoints" if find_model("checkpoints", overrides["checkpoint"]) else "diffusion_models")
+    if overrides.get("loras") is not None:
+        gen["loras"] = parse_lora_tags(overrides["loras"])
+    loras = gen.setdefault("loras", [])
+    known = {model_stem(name).lower() for name, _ in loras}
+    loras.extend(tag for tag in parse_lora_tags(gen.get("prompt", "")) if model_stem(tag[0]).lower() not in known)
+    if easy_remix:
+        gen["prompt"] = shorten_embeddings(strip_lora_tags(gen.get("prompt", "")))
+        gen["negative_prompt"] = shorten_embeddings(gen.get("negative_prompt", ""))
+    gen["width"], gen["height"] = width, height
+    return gen
+
+
+def generation_parameters(gen: dict, add_loras_to_prompt: bool, additional_data: str) -> tuple[str, str]:
+    checkpoint = describe_model(gen["checkpoint"][1], gen["checkpoint"][0]) if gen.get("checkpoint") else None
+    loras = [{**describe_model("loras", name), "strength": strength} for name, strength in gen["loras"]]
+    embeddings = [describe(path) for name in embedding_names(gen.get("prompt", ""), gen.get("negative_prompt", "")) if (path := find_model("embeddings", name))]
+    text = format_parameters(gen, checkpoint, loras, embeddings, add_loras_to_prompt, additional_data)
+    return text, with_recipe(text, build_recipe(gen, checkpoint, loras))
+
+
+# The save of both nodes. `options` holds the settings of the chosen format; returns the parameters text and the saved images.
+def save_images(hidden, images, filename_prefix: str, file_format: str, options: dict, save: bool, embed_workflow: bool, recipe_metadata: bool,
+                add_loras_to_prompt: bool, save_with_metadata: bool, counter: bool, overwrite: bool, easy_remix: bool, save_workflow_as_json: bool,
+                caption_txt: bool, additional_data: str, overrides: dict) -> tuple[str, list[dict]]:
+    if file_format not in EXTENSIONS or (file_format == "jpeg" and options["jpeg_subsampling"] not in SUBSAMPLING):
+        raise ValueError("Unknown file format or JPEG subsampling.")
+    height, width = images.shape[1], images.shape[2]
+    try:
+        gen = generation(hidden, width, height, easy_remix, overrides)
+        parameters, with_block = generation_parameters(gen, add_loras_to_prompt, additional_data)
+    except Exception:
+        # An unusual graph must never cost the image: save it without generation parameters.
+        logging.warning("MooBox Save Image: could not read the generation settings from the graph.", exc_info=True)
+        gen, parameters, with_block = {"width": width, "height": height}, "", ""
+    embedded = (with_block if recipe_metadata else parameters) if save_with_metadata and not args.disable_metadata else ""
+    extra = hidden.extra_pnginfo or {}
+    chunks = {}
+    if embed_workflow and not args.disable_metadata:
+        if hidden.prompt is not None:
+            chunks["prompt"] = json.dumps(hidden.prompt)
+        chunks.update((key, json.dumps(value)) for key, value in extra.items())
+    caption = gen.get("prompt", "") if caption_txt else None
+    workflow = extra.get("workflow") if save_workflow_as_json else None
+
+    now = datetime.now()
+    parts, name, digits = split_prefix(expand_tokens(filename_prefix, token_values(gen), now), now)
+    extension = EXTENSIONS[file_format]
+    if save:
+        folder = output_folder(folder_paths.get_output_directory(), parts)
+        names = plan_names(name, list(range(len(images))), extension, existing_stems(folder), counter, overwrite, digits)
+        subfolder = os.path.join(*parts) if parts else ""
+    else:
+        folder, subfolder, run = folder_paths.get_temp_directory(), "", uuid.uuid4().hex[:12]
+        os.makedirs(folder, exist_ok=True)
+        names = [f"{TEMP_PREFIX}{run}_{index:05d}{extension}" for index in range(len(images))]
+    results = []
+    for index, (tensor, file) in enumerate(zip(images, names)):
+        image = Image.fromarray(np.clip(255.0 * tensor.cpu().numpy(), 0, 255).astype(np.uint8))
+        path = os.path.join(folder, file)
+        write_image(image, path, file_format, embedded, chunks, options)
+        if save:
+            write_sidecars(folder, os.path.splitext(file)[0], caption, workflow)
+        else:
+            # What the Save button needs to name and complete this preview like a normal save of this run.
+            with open(path + MANIFEST, "w", encoding="utf-8") as manifest:
+                json.dump({"run": run, "index": index, "folder": parts, "name": name, "digits": digits, "counter": counter,
+                           "overwrite": overwrite, "caption": caption, "workflow": workflow}, manifest)
+        results.append({"filename": file, "subfolder": subfolder, "type": "output" if save else "temp"})
+    return parameters, results
+
+
 class MooBoxSaveImage(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(
             node_id="MooBoxSaveImage",
-            display_name="Save Image (MooBox)",
+            display_name="Save Image Advanced (MooBox)",
             category="MooBox/Utility",
             description="Saves images with A1111 parameters, the ComfyUI workflow and a LoRA Manager recipe block read from the graph.",
             is_output_node=True,
@@ -172,11 +270,11 @@ class MooBoxSaveImage(io.ComfyNode):
                 io.Boolean.Input("save_with_metadata", default=True, advanced=True, tooltip="Embed the A1111 parameters (and the recipe block). Off: no generation parameters in the file."),
                 io.Boolean.Input("counter", default=True, advanced=True, tooltip="Add a counter to the file name. Off: a fixed name gets a _0001 suffix when it exists, unless overwrite is on."),
                 io.Boolean.Input("overwrite", default=False, advanced=True, tooltip="With the counter off, replace a file with the same name instead of adding a suffix."),
-                io.Int.Input("quality", default=95, min=1, max=100, advanced=True, tooltip="JPEG and lossy WebP quality."),
+                quality_input(advanced=True),
                 io.Boolean.Input("lossless_webp", default=False, advanced=True),
-                io.Int.Input("webp_method", default=4, min=0, max=6, advanced=True, tooltip="WebP effort: 0 is fastest, 6 smallest."),
-                io.Combo.Input("jpeg_subsampling", options=list(SUBSAMPLING), advanced=True),
-                io.Int.Input("compress_level", default=4, min=0, max=9, advanced=True, tooltip="PNG compression level."),
+                webp_method_input(advanced=True),
+                jpeg_subsampling_input(advanced=True),
+                compress_level_input(advanced=True),
                 io.Boolean.Input("optimize_png", default=False, advanced=True, tooltip="Smallest PNG at the cost of save time."),
                 io.Boolean.Input("easy_remix", default=False, advanced=True, tooltip="Remove <lora:...> tags from the saved prompt and shorten embedding paths to their names."),
                 io.Boolean.Input("save_workflow_as_json", default=False, advanced=True, tooltip="Also write the workflow as <name>.json next to the image."),
@@ -186,91 +284,59 @@ class MooBoxSaveImage(io.ComfyNode):
                 io.String.Input("negative", optional=True, force_input=True, tooltip="Use this negative prompt instead of the one found in the graph."),
                 io.String.Input("loras", optional=True, force_input=True, tooltip="<lora:name:strength> tags that replace the LoRAs found in the graph."),
                 io.String.Input("checkpoint", optional=True, force_input=True, tooltip="Checkpoint or diffusion model file name to record instead of the one found."),
-                io.Int.Input("seed", optional=True, force_input=True),
-                io.Int.Input("steps", optional=True, force_input=True),
-                io.Float.Input("cfg", optional=True, force_input=True),
-                io.String.Input("sampler_name", optional=True, force_input=True),
-                io.String.Input("scheduler", optional=True, force_input=True),
             ],
             outputs=[io.Image.Output("images"), io.String.Output("parameters")],
             hidden=[io.Hidden.prompt, io.Hidden.extra_pnginfo, io.Hidden.unique_id],
         )
 
-    @classmethod
-    def generation(cls, width: int, height: int, easy_remix: bool, overrides: dict) -> dict:
-        gen = extract_generation(cls.hidden.prompt, str(cls.hidden.unique_id), tag_categories())
-        for name, key in (("positive", "prompt"), ("negative", "negative_prompt"), ("seed", "seed"), ("steps", "steps"), ("cfg", "cfg"), ("sampler_name", "sampler"), ("scheduler", "scheduler")):
-            if overrides.get(name) is not None:
-                gen[key] = overrides[name]
-        if overrides.get("checkpoint"):
-            gen["checkpoint"] = (overrides["checkpoint"], "checkpoints" if find_model("checkpoints", overrides["checkpoint"]) else "diffusion_models")
-        if overrides.get("loras") is not None:
-            gen["loras"] = parse_lora_tags(overrides["loras"])
-        loras = gen.setdefault("loras", [])
-        known = {model_stem(name).lower() for name, _ in loras}
-        loras.extend(tag for tag in parse_lora_tags(gen.get("prompt", "")) if model_stem(tag[0]).lower() not in known)
-        if easy_remix:
-            gen["prompt"] = shorten_embeddings(strip_lora_tags(gen.get("prompt", "")))
-            gen["negative_prompt"] = shorten_embeddings(gen.get("negative_prompt", ""))
-        gen["width"], gen["height"] = width, height
-        return gen
-
-    @classmethod
-    def parameters(cls, gen: dict, add_loras_to_prompt: bool, additional_data: str) -> tuple[str, str]:
-        checkpoint = describe_model(gen["checkpoint"][1], gen["checkpoint"][0]) if gen.get("checkpoint") else None
-        loras = [{**describe_model("loras", name), "strength": strength} for name, strength in gen["loras"]]
-        embeddings = [describe(path) for name in embedding_names(gen.get("prompt", ""), gen.get("negative_prompt", "")) if (path := find_model("embeddings", name))]
-        text = format_parameters(gen, checkpoint, loras, embeddings, add_loras_to_prompt, additional_data)
-        return text, with_recipe(text, build_recipe(gen, checkpoint, loras))
-
+    # `overrides` holds positive, negative, loras and checkpoint when connected. It also takes inputs of older versions
+    # (seed, steps, cfg, sampler_name, scheduler): ComfyUI still passes a link a saved workflow keeps to them.
     @classmethod
     def execute(cls, images, filename_prefix, file_format, save, embed_workflow, recipe_metadata, add_loras_to_prompt, save_with_metadata, counter, overwrite,
                 quality, lossless_webp, webp_method, jpeg_subsampling, compress_level, optimize_png, easy_remix, save_workflow_as_json, caption_txt,
                 additional_data, **overrides) -> io.NodeOutput:
-        if file_format not in EXTENSIONS or jpeg_subsampling not in SUBSAMPLING:
-            raise ValueError("Unknown file format or JPEG subsampling.")
-        height, width = images.shape[1], images.shape[2]
-        try:
-            gen = cls.generation(width, height, easy_remix, overrides)
-            parameters, with_block = cls.parameters(gen, add_loras_to_prompt, additional_data)
-        except Exception:
-            # An unusual graph must never cost the image: save it without generation parameters.
-            logging.warning("MooBox Save Image: could not read the generation settings from the graph.", exc_info=True)
-            gen, parameters, with_block = {"width": width, "height": height}, "", ""
-        embedded = (with_block if recipe_metadata else parameters) if save_with_metadata and not args.disable_metadata else ""
-        extra = cls.hidden.extra_pnginfo or {}
-        chunks = {}
-        if embed_workflow and not args.disable_metadata:
-            if cls.hidden.prompt is not None:
-                chunks["prompt"] = json.dumps(cls.hidden.prompt)
-            chunks.update((key, json.dumps(value)) for key, value in extra.items())
-        caption = gen.get("prompt", "") if caption_txt else None
-        workflow = extra.get("workflow") if save_workflow_as_json else None
-
-        now = datetime.now()
-        parts, name, digits = split_prefix(expand_tokens(filename_prefix, token_values(gen), now), now)
-        extension = EXTENSIONS[file_format]
-        if save:
-            folder = output_folder(folder_paths.get_output_directory(), parts)
-            names = plan_names(name, list(range(len(images))), extension, existing_stems(folder), counter, overwrite, digits)
-            subfolder = os.path.join(*parts) if parts else ""
-        else:
-            folder, subfolder, run = folder_paths.get_temp_directory(), "", uuid.uuid4().hex[:12]
-            os.makedirs(folder, exist_ok=True)
-            names = [f"{TEMP_PREFIX}{run}_{index:05d}{extension}" for index in range(len(images))]
         options = {"quality": quality, "lossless_webp": lossless_webp, "webp_method": webp_method, "jpeg_subsampling": jpeg_subsampling,
                    "compress_level": compress_level, "optimize_png": optimize_png}
-        results = []
-        for index, (tensor, file) in enumerate(zip(images, names)):
-            image = Image.fromarray(np.clip(255.0 * tensor.cpu().numpy(), 0, 255).astype(np.uint8))
-            path = os.path.join(folder, file)
-            write_image(image, path, file_format, embedded, chunks, options)
-            if save:
-                write_sidecars(folder, os.path.splitext(file)[0], caption, workflow)
-            else:
-                # What the Save button needs to name and complete this preview like a normal save of this run.
-                with open(path + MANIFEST, "w", encoding="utf-8") as manifest:
-                    json.dump({"run": run, "index": index, "folder": parts, "name": name, "digits": digits, "counter": counter,
-                               "overwrite": overwrite, "caption": caption, "workflow": workflow}, manifest)
-            results.append({"filename": file, "subfolder": subfolder, "type": "output" if save else "temp"})
+        parameters, results = save_images(cls.hidden, images, filename_prefix, file_format, options, save, embed_workflow, recipe_metadata, add_loras_to_prompt,
+                                          save_with_metadata, counter, overwrite, easy_remix, save_workflow_as_json, caption_txt, additional_data, overrides)
         return io.NodeOutput(images, parameters, ui={"images": results})
+
+
+# The fixed settings of Save Image (MooBox); the advanced node exposes them all.
+SIMPLE_SETTINGS = {"save": True, "embed_workflow": False, "recipe_metadata": True, "add_loras_to_prompt": True, "save_with_metadata": True, "counter": True,
+                   "overwrite": False, "easy_remix": False, "save_workflow_as_json": False, "caption_txt": False, "additional_data": "", "overrides": {}}
+
+
+class MooBoxSaveImageSimple(io.ComfyNode):
+    # Not a subclass of MooBoxSaveImage: ComfyUI caches the outputs on the class, and a subclass would inherit them.
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="MooBoxSaveImageSimple",
+            display_name="Save Image (MooBox)",
+            category="MooBox/Utility",
+            description="Saves images with A1111 parameters and a LoRA Manager recipe block read from the graph. Without the ComfyUI workflow.",
+            is_output_node=True,
+            inputs=[
+                io.Image.Input("images"),
+                io.String.Input("filename_prefix", default="ComfyUI", tooltip="File name, may contain subfolders. Tokens: %date%, %date:yyyy-MM-dd%, %time%, %seed%, %width%, %height%, %steps%, %cfg%, %sampler%, %scheduler%, %model%, %model:N%, %pprompt:N%, %nprompt:N%, %batch_num%, %counter%, %counter:N%."),
+                # Each format shows only its own options; ComfyUI keeps the values of the others while the node is open.
+                io.DynamicCombo.Input("file_format", options=[
+                    io.DynamicCombo.Option("png", [compress_level_input()]),
+                    io.DynamicCombo.Option("jpeg", [quality_input(), jpeg_subsampling_input()]),
+                    io.DynamicCombo.Option("webp", [
+                        io.DynamicCombo.Input("lossless_webp", options=[io.DynamicCombo.Option("off", [quality_input()]), io.DynamicCombo.Option("on", [])]),
+                        webp_method_input(),
+                    ]),
+                ]),
+            ],
+            hidden=[io.Hidden.prompt, io.Hidden.extra_pnginfo, io.Hidden.unique_id],
+        )
+
+    @classmethod
+    def execute(cls, images, filename_prefix, file_format: dict) -> io.NodeOutput:
+        # file_format is {"file_format": "webp", "lossless_webp": {"lossless_webp": "off", "quality": 95}, "webp_method": 4} and the like.
+        lossless = file_format.get("lossless_webp", {})
+        options = {"quality": DEFAULT_QUALITY, **file_format, **lossless, "lossless_webp": lossless.get("lossless_webp") == "on", "optimize_png": False}
+        _, results = save_images(cls.hidden, images, filename_prefix, file_format["file_format"], options, **SIMPLE_SETTINGS)
+        return io.NodeOutput(ui={"images": results})

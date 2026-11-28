@@ -1,4 +1,4 @@
-// The Save button of Save Image (MooBox) only exists while the save toggle is off.
+// The Save button of Save Image Advanced (MooBox) only exists while the save toggle is off.
 export const exportVisible = (save) => save === false;
 
 // The temp previews of the last run that the export route accepts.
